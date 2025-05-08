@@ -62,9 +62,54 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
   }
 
   Future<void> _call({required bool video}) async {
+    print('Gọi tới: ${_textController.text}');
     String dest = _textController.text;
     print('Gọi tới: $dest');
     if (dest.isEmpty) return;
+
+    // Kiểm tra trạng thái kết nối SIP
+    if (widget.helper?.registerState.state != RegistrationStateEnum.REGISTERED) {
+      if (!mounted) return;
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            backgroundColor: Colors.black87,
+            title: Text(
+              'Không thể thực hiện cuộc gọi',
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Chưa kết nối được với máy chủ SIP.',
+                  style: TextStyle(color: Colors.white70),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Vui lòng kiểm tra lại kết nối mạng và thử lại.',
+                  style: TextStyle(color: Colors.white70, fontSize: 12),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'Đóng',
+                  style: TextStyle(color: Colors.blue),
+                ),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
     if (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS) {
       await Permission.microphone.request();
@@ -118,6 +163,11 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
         child: Column(
           mainAxisAlignment: MainAxisAlignment.end,
           children: [
+            SizedBox(height: 10),
+            Text(
+              'SIP: ${widget.helper?.registerState.state.toString()}',
+              style: TextStyle(color: Colors.white, fontSize: 14),
+            ),
             SizedBox(height: 40),
             Text(
               _textController.text,
@@ -132,7 +182,10 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
               children: [
                 SizedBox(width: 70),
                 GestureDetector(
-                  onTap: () => _call(video: false),
+                  onTap: () {
+                    print('Nút call đã được nhấn');
+                    _call(video: false);
+                  },
                   child: Container(
                     width: 70,
                     height: 70,

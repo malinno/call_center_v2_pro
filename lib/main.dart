@@ -14,14 +14,23 @@ import 'src/dialpad.dart';
 import 'src/register.dart';
 import 'src/intro_screen.dart';
 import 'src/main_tabs.dart';
+import 'src/z_solution_login_widget.dart';
+
 void main() {
   Logger.level = Level.warning;
   if (WebRTC.platformIsDesktop) {
     debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
   }
+  final SIPUAHelper normalHelper = SIPUAHelper();
+  final SIPUAHelper zSolutionHelper = SIPUAHelper();
+  
   runApp(
     MultiProvider(
-      providers: [ChangeNotifierProvider(create: (_) => ThemeProvider())],
+      providers: [
+        Provider<SIPUAHelper>.value(value: normalHelper),
+        Provider<SIPUAHelper>.value(value: zSolutionHelper),
+        ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
+      ],
       child: MyApp(),
     ),
   );
@@ -32,49 +41,46 @@ typedef PageContentBuilder = Widget Function(
 
 // ignore: must_be_immutable
 class MyApp extends StatelessWidget {
-  final SIPUAHelper _helper = SIPUAHelper();
-  Map<String, PageContentBuilder> routes = {
-    '/home': ([SIPUAHelper? helper, Object? arguments]) => MainTabs(helper),
-    '/intro': ([SIPUAHelper? helper, Object? arguments]) => IntroScreen(),
-    '/': ([SIPUAHelper? helper, Object? arguments]) => DialPadWidget(helper),
-    '/register': ([SIPUAHelper? helper, Object? arguments]) =>
-        RegisterWidget(helper),
-    '/callscreen': ([SIPUAHelper? helper, Object? arguments]) =>
-        CallScreenWidget(helper, arguments as Call?),
-    '/about': ([SIPUAHelper? helper, Object? arguments]) => AboutWidget(),
-  };
-
-  Route<dynamic>? _onGenerateRoute(RouteSettings settings) {
-    final String? name = settings.name;
-    final PageContentBuilder? pageContentBuilder = routes[name!];
-    if (pageContentBuilder != null) {
-      if (settings.arguments != null) {
-        final Route route = MaterialPageRoute<Widget>(
-            builder: (context) =>
-                pageContentBuilder(_helper, settings.arguments));
-        return route;
-      } else {
-        final Route route = MaterialPageRoute<Widget>(
-            builder: (context) => pageContentBuilder(_helper));
-        return route;
-      }
-    }
-    return null;
-  }
-
   @override
   Widget build(BuildContext context) {
+    final SIPUAHelper helper = Provider.of<SIPUAHelper>(context, listen: false);
     return MultiProvider(
       providers: [
-        Provider<SIPUAHelper>.value(value: _helper),
         Provider<SipUserCubit>(
-            create: (context) => SipUserCubit(sipHelper: _helper)),
+            create: (context) => SipUserCubit(sipHelper: helper)),
       ],
       child: MaterialApp(
         title: 'SOLY',
         theme: Provider.of<ThemeProvider>(context).currentTheme,
         initialRoute: '/intro',
-        onGenerateRoute: _onGenerateRoute,
+        onGenerateRoute: (settings) {
+          final String? name = settings.name;
+          final Map<String, PageContentBuilder> routes = {
+            '/home': ([SIPUAHelper? h, Object? arguments]) {
+              if (arguments is SIPUAHelper) {
+                return MainTabs(arguments);
+              }
+              return MainTabs(h);
+            },
+            '/intro': ([SIPUAHelper? h, Object? arguments]) => IntroScreen(),
+            '/': ([SIPUAHelper? h, Object? arguments]) => DialPadWidget(h),
+            '/register': ([SIPUAHelper? h, Object? arguments]) => RegisterWidget(h),
+            '/callscreen': ([SIPUAHelper? h, Object? arguments]) => CallScreenWidget(h, settings.arguments as Call?),
+            '/about': ([SIPUAHelper? h, Object? arguments]) => AboutWidget(),
+          };
+          final PageContentBuilder? pageContentBuilder = routes[name!];
+          if (pageContentBuilder != null) {
+            if (settings.arguments != null) {
+              return MaterialPageRoute<Widget>(
+                  builder: (context) =>
+                      pageContentBuilder(helper, settings.arguments));
+            } else {
+              return MaterialPageRoute<Widget>(
+                  builder: (context) => pageContentBuilder(helper));
+            }
+          }
+          return null;
+        },
       ),
     );
   }

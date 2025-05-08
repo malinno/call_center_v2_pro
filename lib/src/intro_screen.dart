@@ -37,26 +37,19 @@ class _IntroScreenState extends State<IntroScreen> {
           ),
         ),
         child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.check_circle, size: 100, color: Colors.white),
-              SizedBox(height: 24),
-              Text(
-                "SOLY",
-                style: TextStyle(
-                  fontSize: 40,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  letterSpacing: 2,
-                ),
-              ),
-              SizedBox(height: 16),
-              Text(
-                "Chào mừng bạn đến với ứng dụng!",
-                style: TextStyle(color: Colors.white70, fontSize: 18),
-              ),
-            ],
+          child: TweenAnimationBuilder<double>(
+            tween: Tween(begin: 0.7, end: 1.0),
+            duration: const Duration(milliseconds: 900),
+            curve: Curves.easeOutBack,
+            builder: (context, scale, child) => Transform.scale(
+              scale: scale,
+              child: child,
+            ),
+            child: Image.asset(
+              'lib/src/assets/Soly.png',
+              width: 100,
+              height: 100,
+            ),
           ),
         ),
       ),

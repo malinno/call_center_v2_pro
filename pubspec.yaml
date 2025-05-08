@@ -30,7 +30,8 @@ dependencies:
   logger: ^2.5.0
   fluttertoast: ^8.2.4
   another_flushbar: ^1.12.30
-
+  http: ^1.1.0
+  
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -41,6 +42,9 @@ dev_dependencies:
 
 # The following section is specific to Flutter.
 flutter:
+  assets:
+    - lib/src/assets/logo.png
+    - lib/src/assets/Soly.png
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

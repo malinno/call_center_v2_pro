@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
+import 'models/zsolution_user.dart';
 
 class AccountWidget extends StatefulWidget {
   const AccountWidget({Key? key}) : super(key: key);
@@ -11,6 +13,8 @@ class AccountWidget extends StatefulWidget {
 class _AccountWidgetState extends State<AccountWidget> {
   String? _username;
   String? _server;
+  ZSolutionUser? _zsolutionUser;
+  bool _isZSolutionLogin = false;
 
   @override
   void initState() {
@@ -21,8 +25,21 @@ class _AccountWidgetState extends State<AccountWidget> {
   Future<void> _loadAccount() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      _username = prefs.getString('auth_user') ?? '';
-      _server = prefs.getString('ws_uri') ?? '';
+      // Load ZSolution user data if exists
+      final zsolutionUserJson = prefs.getString('zsolution_user');
+      if (zsolutionUserJson != null && zsolutionUserJson.isNotEmpty) {
+        try {
+          final Map<String, dynamic> jsonData = jsonDecode(zsolutionUserJson);
+          _zsolutionUser = ZSolutionUser.fromJson(jsonData);
+          _isZSolutionLogin = true;
+        } catch (e) {
+          _isZSolutionLogin = false;
+        }
+      } else {
+        _username = prefs.getString('auth_user') ?? '';
+        _server = prefs.getString('ws_uri') ?? '';
+        _isZSolutionLogin = false;
+      }
     });
   }
 
@@ -32,6 +49,8 @@ class _AccountWidgetState extends State<AccountWidget> {
     await prefs.remove('auth_user');
     await prefs.remove('ws_uri');
     await prefs.remove('password');
+    await prefs.remove('zsolution_token');
+    await prefs.remove('zsolution_user');
     if (mounted) {
       Navigator.pushNamedAndRemoveUntil(context, '/register', (route) => false);
     }
@@ -53,9 +72,19 @@ class _AccountWidgetState extends State<AccountWidget> {
                 style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
               ),
               SizedBox(height: 24),
-              Text('Username: $_username', style: TextStyle(color: Colors.white70, fontSize: 18)),
-              SizedBox(height: 8),
-              Text('Server: $_server', style: TextStyle(color: Colors.white70, fontSize: 18)),
+              if (_isZSolutionLogin && _zsolutionUser != null) ...[
+                Text('Username: ${_zsolutionUser!.userName}', 
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+                SizedBox(height: 8),
+                Text('Role: ${_zsolutionUser!.roleName}', 
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+              ] else ...[
+                Text('Username: $_username', 
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+                SizedBox(height: 8),
+                Text('Server: $_server', 
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+              ],
               SizedBox(height: 32),
               ElevatedButton(
                 onPressed: _logout,
