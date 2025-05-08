@@ -1,441 +1,190 @@
-import 'package:dart_sip_ua_example/src/theme_provider.dart';
-import 'package:dart_sip_ua_example/src/user_state/sip_user_cubit.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_webrtc/flutter_webrtc.dart';
-import 'package:logger/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sip_ua/sip_ua.dart';
-
-import 'widgets/action_button.dart';
+import 'call_history.dart';
 
 class DialPadWidget extends StatefulWidget {
-  final SIPUAHelper? _helper;
-
-  DialPadWidget(this._helper, {Key? key}) : super(key: key);
+  final SIPUAHelper? helper;
+  DialPadWidget(this.helper, {Key? key}) : super(key: key);
 
   @override
-  State<DialPadWidget> createState() => _MyDialPadWidget();
+  _DialPadWidgetState createState() => _DialPadWidgetState();
 }
 
-class _MyDialPadWidget extends State<DialPadWidget>
-    implements SipUaHelperListener {
-  String? _dest;
-  SIPUAHelper? get helper => widget._helper;
-  TextEditingController? _textController;
+class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperListener {
+  late TextEditingController _textController;
   late SharedPreferences _preferences;
-  late SipUserCubit currentUserCubit;
 
-  final Logger _logger = Logger();
-
-  String? receivedMsg;
+  // Key definitions
+  final List<List<Map<String, String>>> _keys = const [
+    [ {'1': ''}, {'2': 'ABC'}, {'3': 'DEF'} ],
+    [ {'4': 'GHI'}, {'5': 'JKL'}, {'6': 'MNO'} ],
+    [ {'7': 'PQRS'}, {'8': 'TUV'}, {'9': 'WXYZ'} ],
+    [ {'*': ''}, {'0': '+'}, {'#': ''} ],
+  ];
 
   @override
-  initState() {
+  void initState() {
     super.initState();
-    receivedMsg = "";
-    _bindEventListeners();
-    _loadSettings();
+    _textController = TextEditingController();
+    widget.helper?.addSipUaHelperListener(this);
+    _loadDest();
   }
 
-  void _loadSettings() async {
+  Future<void> _loadDest() async {
     _preferences = await SharedPreferences.getInstance();
-    _dest ='442002@c6.zsolution.vn';
-    _textController = TextEditingController(text: _dest);
-    _textController!.text = _dest!;
-
-    setState(() {});
+    setState(() => _textController.clear());
   }
 
-  void _bindEventListeners() {
-    helper!.addSipUaHelperListener(this);
+  @override
+  void dispose() {
+    widget.helper?.removeSipUaHelperListener(this);
+    _textController.dispose();
+    super.dispose();
   }
 
-  Future<Widget?> _handleCall(BuildContext context,
-      [bool voiceOnly = false]) async {
-    final dest = _textController?.text;
+  void _append(String num) {
+    setState(() {
+      _textController.text += num;
+    });
+  }
+
+  void _backspace() {
+    final text = _textController.text;
+    if (text.isNotEmpty) {
+      setState(() {
+        _textController.text = text.substring(0, text.length - 1);
+      });
+    }
+  }
+
+  Future<void> _call({required bool video}) async {
+    String dest = _textController.text;
+    print('Gọi tới: $dest');
+    if (dest.isEmpty) return;
     if (defaultTargetPlatform == TargetPlatform.android ||
         defaultTargetPlatform == TargetPlatform.iOS) {
       await Permission.microphone.request();
       await Permission.camera.request();
     }
-    if (dest == null || dest.isEmpty) {
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Target is empty.'),
-            content: Text('Please enter a SIP URI or username!'),
-            actions: <Widget>[
-              TextButton(
-                child: Text('Ok'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          );
-        },
-      );
-      return null;
-    }
-
-    var mediaConstraints = <String, dynamic>{
-      'audio': true,
-      'video': voiceOnly ? false : {
-        'mandatory': <String, dynamic>{
-          'minWidth': '640',
-          'minHeight': '480',
-          'minFrameRate': '30',
-        },
-        'facingMode': 'user',
-      }
-    };
-
-    MediaStream? mediaStream;
-
-    try {
-      if (kIsWeb && !voiceOnly) {
-        mediaStream = await navigator.mediaDevices.getDisplayMedia(mediaConstraints);
-        if (mediaStream != null) {
-          mediaConstraints['video'] = false;
-          MediaStream userStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-          if (userStream != null) {
-            final audioTracks = userStream.getAudioTracks();
-            if (audioTracks.isNotEmpty) {
-              mediaStream.addTrack(audioTracks.first, addToNative: true);
-            }
-          }
-        }
-      } else {
-        mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      }
-
-      if (mediaStream != null) {
-        // Check if we have the required tracks
-        final audioTracks = mediaStream.getAudioTracks();
-        final videoTracks = mediaStream.getVideoTracks();
-        
-        if (audioTracks.isEmpty) {
-          throw Exception('No audio track available');
-        }
-        
-        if (!voiceOnly && videoTracks.isEmpty) {
-          throw Exception('No video track available');
-        }
-
-        helper!.call(dest, voiceOnly: voiceOnly, mediaStream: mediaStream);
-        _preferences.setString('dest', dest);
-      } else {
-        throw Exception('Failed to get media stream');
-      }
-    } catch (e) {
-      print('Error getting media stream: $e');
-      showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            title: Text('Error'),
-            content: Text('Failed to access camera/microphone: $e'),
-            actions: <Widget>[
-              TextButton(
-                child: Text('Ok'),
-                onPressed: () {
-                  Navigator.of(context).pop();
-                },
-              ),
-            ],
-          );
-        },
-      );
-    }
-    return null;
+    widget.helper?.call(dest, voiceOnly: !video);
+    _preferences.setString('dest', dest);
   }
 
-  void _handleBackSpace([bool deleteAll = false]) {
-    var text = _textController!.text;
-    if (text.isNotEmpty) {
-      setState(() {
-        text = deleteAll ? '' : text.substring(0, text.length - 1);
-        _textController!.text = text;
-      });
-    }
-  }
-
-  void _handleNum(String number) {
-    setState(() {
-      _textController!.text += number;
-    });
-  }
-
-  List<Widget> _buildNumPad() {
-    final labels = [
-      [
-        {'1': ''},
-        {'2': 'abc'},
-        {'3': 'def'}
-      ],
-      [
-        {'4': 'ghi'},
-        {'5': 'jkl'},
-        {'6': 'mno'}
-      ],
-      [
-        {'7': 'pqrs'},
-        {'8': 'tuv'},
-        {'9': 'wxyz'}
-      ],
-      [
-        {'*': ''},
-        {'0': '+'},
-        {'#': ''}
-      ],
-    ];
-
-    return labels
-        .map((row) => Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: row
-                    .map((label) => ActionButton(
-                          title: label.keys.first,
-                          subTitle: label.values.first,
-                          onPressed: () => _handleNum(label.keys.first),
-                          number: true,
-                        ))
-                    .toList())))
-        .toList();
-  }
-
-  List<Widget> _buildDialPad() {
-    Color? textFieldColor =
-        Theme.of(context).textTheme.bodyMedium?.color?.withValues(alpha: 0.5);
-    Color? textFieldFill =
-        Theme.of(context).buttonTheme.colorScheme?.surfaceContainerLowest;
-    return [
-      Align(
-        alignment: AlignmentDirectional.centerStart,
-        child: Text('Destination URL'),
-      ),
-      const SizedBox(height: 8),
-      TextField(
-        keyboardType: TextInputType.text,
-        textAlign: TextAlign.center,
-        style: TextStyle(fontSize: 18, color: textFieldColor),
-        maxLines: 2,
-        decoration: InputDecoration(
-          filled: true,
-          fillColor: textFieldFill,
-          border: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(5),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderSide: BorderSide(color: Colors.blue.withValues(alpha: 0.5)),
-            borderRadius: BorderRadius.circular(5),
-          ),
+  Widget _buildButton(Map<String, String> keyData) {
+    final num = keyData.keys.first;
+    final letters = keyData.values.first;
+    return GestureDetector(
+      onTap: () => _append(num),
+      child: Container(
+        width: 80,
+        height: 80,
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.08),
+          shape: BoxShape.circle,
         ),
-        controller: _textController,
-      ),
-      SizedBox(height: 20),
-      Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: _buildNumPad(),
-      ),
-      Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: <Widget>[
-            ActionButton(
-              icon: Icons.videocam,
-              onPressed: () => _handleCall(context),
-            ),
-            ActionButton(
-              icon: Icons.dialer_sip,
-              fillColor: Colors.green,
-              onPressed: () => _handleCall(context, true),
-            ),
-            ActionButton(
-              icon: Icons.keyboard_arrow_left,
-              onPressed: () => _handleBackSpace(),
-              onLongPress: () => _handleBackSpace(true),
-            ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(num, style: TextStyle(color: Colors.white, fontSize: 32)),
+            if (letters.isNotEmpty)
+              Text(letters, style: TextStyle(color: Colors.white70, fontSize: 12)),
           ],
         ),
-      ),
-    ];
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    Color? textColor = Theme.of(context).textTheme.bodyMedium?.color;
-    Color? iconColor = Theme.of(context).iconTheme.color;
-    bool isDarkTheme = Theme.of(context).brightness == Brightness.dark;
-    currentUserCubit = context.watch<SipUserCubit>();
-
-    return Scaffold(
-      appBar: AppBar(
-        title: Text("Dart SIP UA Demo"),
-        actions: <Widget>[
-          PopupMenuButton<String>(
-              onSelected: (String value) {
-                switch (value) {
-                  case 'account':
-                    Navigator.pushNamed(context, '/register');
-                    break;
-                  case 'about':
-                    Navigator.pushNamed(context, '/about');
-                    break;
-                  case 'theme':
-                    final themeProvider = Provider.of<ThemeProvider>(context,
-                        listen:
-                            false); // get the provider, listen false is necessary cause is in a function
-
-                    setState(() {
-                      isDarkTheme = !isDarkTheme;
-                    }); // change the variable
-
-                    isDarkTheme // call the functions
-                        ? themeProvider.setDarkmode()
-                        : themeProvider.setLightMode();
-                    break;
-                  default:
-                    break;
-                }
-              },
-              icon: Icon(Icons.menu),
-              itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
-                    PopupMenuItem(
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.account_circle,
-                            color: iconColor,
-                          ),
-                          SizedBox(width: 12),
-                          Text('Account'),
-                        ],
-                      ),
-                      value: 'account',
-                    ),
-                    PopupMenuItem(
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.info,
-                            color: iconColor,
-                          ),
-                          SizedBox(width: 12),
-                          Text('About'),
-                        ],
-                      ),
-                      value: 'about',
-                    ),
-                    PopupMenuItem(
-                      child: Row(
-                        children: <Widget>[
-                          Icon(
-                            Icons.info,
-                            color: iconColor,
-                          ),
-                          SizedBox(width: 12),
-                          Text(isDarkTheme ? 'Light Mode' : 'Dark Mode'),
-                        ],
-                      ),
-                      value: 'theme',
-                    )
-                  ]),
-        ],
-      ),
-      body: ListView(
-        padding: EdgeInsets.symmetric(horizontal: 12),
-        children: <Widget>[
-          SizedBox(height: 8),
-          Center(
-            child: Text(
-              'Register Status: ${helper!.registerState.state?.name ?? ''}',
-              style: TextStyle(fontSize: 18, color: textColor),
-            ),
-          ),
-          SizedBox(height: 8),
-          Center(
-            child: Text(
-              'Received Message: $receivedMsg',
-              style: TextStyle(fontSize: 16, color: textColor),
-            ),
-          ),
-          SizedBox(height: 8),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: _buildDialPad(),
-          ),
-        ],
       ),
     );
   }
 
-  @override
-  void registrationStateChanged(RegistrationState state) {
-    setState(() {
-      _logger.i("Registration state: ${state.state?.name}");
-    });
+  List<Widget> _buildKeypad() {
+    return _keys.map((row) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: 6.0),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: row.map(_buildButton).toList(),
+        ),
+      );
+    }).toList();
   }
 
   @override
-  void transportStateChanged(TransportState state) {}
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SafeArea(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.end,
+          children: [
+            SizedBox(height: 40),
+            Text(
+              _textController.text,
+              textAlign: TextAlign.center,
+              style: TextStyle(color: Colors.white, fontSize: 36, letterSpacing: 2),
+            ),
+            SizedBox(height: 20),
+            ..._buildKeypad(),
+            SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                SizedBox(width: 70),
+                GestureDetector(
+                  onTap: () => _call(video: false),
+                  child: Container(
+                    width: 70,
+                    height: 70,
+                    decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                    child: Icon(Icons.call, color: Colors.white, size: 36),
+                  ),
+                ),
+                SizedBox(width: 70,
+                  child: _textController.text.isNotEmpty
+                    ? Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(22),
+                          onTap: _backspace,
+                          onLongPress: () => setState(() => _textController.clear()),
+                          child: Container(
+                            width: 44,
+                            height: 44,
+                            alignment: Alignment.center,
+                            child: Icon(
+                              Icons.backspace_outlined,
+                              color: Colors.white70,
+                              size: 26,
+                            ),
+                          ),
+                        ),
+                      )
+                    : null,
+                ),
+              ],
+            ),
+            SizedBox(height: 40),
+          ],
+        ),
+      ),
+    );
+  }
 
+  @override void registrationStateChanged(RegistrationState state) {}
+  @override void transportStateChanged(TransportState state) {}
   @override
-  void callStateChanged(Call call, CallState callState) {
-    switch (callState.state) {
-      case CallStateEnum.CALL_INITIATION:
-        Navigator.pushNamed(context, '/callscreen', arguments: call);
-        break;
-      case CallStateEnum.FAILED:
-        reRegisterWithCurrentUser();
-        break;
-      case CallStateEnum.ENDED:
-        reRegisterWithCurrentUser();
-        break;
-      default:
+  void callStateChanged(Call call, CallState state) async {
+    if (state.state == CallStateEnum.CALL_INITIATION) {
+      await saveCallHistory(call.remote_identity ?? '');
+      await Navigator.pushNamed(context, '/callscreen', arguments: call);
+      setState(() => _textController.clear());
+    }
+    if (state.state == CallStateEnum.FAILED) {
+      await saveCallHistory(call.remote_identity ?? '', missed: true);
     }
   }
-
-  void reRegisterWithCurrentUser() async {
-    if (currentUserCubit.state == null) return;
-    if (helper!.registered) {
-      helper!.unregister();
-    }
-    _logger.i("Re-registering");
-    currentUserCubit.register(currentUserCubit.state!);
-  }
-
-  @override
-  void onNewMessage(SIPMessageRequest msg) {
-    //Save the incoming message to DB
-    String? msgBody = msg.request.body as String?;
-    setState(() {
-      receivedMsg = msgBody;
-    });
-  }
-
-  @override
-  void onNewNotify(Notify ntf) {}
-
-  @override
-  void onNewReinvite(ReInvite event) {
-    // TODO: implement onNewReinvite
-  }
+  @override void onNewMessage(SIPMessageRequest msg) {}
+  @override void onNewNotify(Notify ntf) {}
+  @override void onNewReinvite(ReInvite event) {}
 }

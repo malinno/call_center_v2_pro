@@ -678,22 +678,116 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: false,
-        title: Text('[$direction] ${_state.name}'),
+@override
+Widget build(BuildContext context) {
+  final textColor = Colors.white;
+  final bg = BoxDecoration(
+    gradient: LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [Colors.black87, Colors.black54],
+    ),
+  );
+
+  return Scaffold(
+    backgroundColor: Colors.transparent,
+    body: Container(
+      decoration: bg,
+      child: SafeArea(
+        child: Column(
+          children: [
+            // --- Header: số/tên và trạng thái ---
+            SizedBox(height: 40),
+            Text(
+              remoteIdentity ?? '',
+              style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            ValueListenableBuilder<String>(
+              valueListenable: _timeLabel,
+              builder: (_, val, __) => Text(
+                val,
+                style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 16),
+              ),
+            ),
+            Spacer(),
+
+            // --- Row nút chức năng: mute, keypad, speaker ---
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                _buildCircleButton(
+                  icon: _audioMuted ? Icons.mic_off : Icons.mic,
+                  label: 'Mute',
+                  onTap: _muteAudio,
+                ),
+                _buildCircleButton(
+                  icon: Icons.dialpad,
+                  label: 'Keypad',
+                  onTap: _handleKeyPad,
+                ),
+                _buildCircleButton(
+                  icon: _speakerOn ? Icons.volume_up : Icons.hearing,
+                  label: 'Speaker',
+                  onTap: _toggleSpeaker,
+                ),
+              ],
+            ),
+
+            Spacer(),
+
+            // --- Hangup button ở giữa dưới cùng ---
+            Padding(
+              padding: const EdgeInsets.only(bottom: 32.0),
+              child: GestureDetector(
+                onTap: _handleHangup,
+                child: Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.call_end, color: Colors.white, size: 36),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-      body: _buildContent(),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Container(
-        width: 320,
-        padding: EdgeInsets.only(bottom: 24.0),
-        child: _buildActionButtons(),
+    ),
+  );
+}
+
+/// Helper để tạo nút tròn với icon + label bên dưới
+Widget _buildCircleButton({
+  required IconData icon,
+  required String label,
+  required VoidCallback onTap,
+}) {
+  return Column(
+    children: [
+      InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(40),
+        child: Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            color: Colors.white12,
+            shape: BoxShape.circle,
+          ),
+          child: Icon(icon, color: Colors.white, size: 28),
+        ),
       ),
-    );
-  }
+      SizedBox(height: 8),
+      Text(
+        label,
+        style: TextStyle(color: Colors.white70, fontSize: 14),
+      ),
+    ],
+  );
+}
+
 
   @override
   void onNewReinvite(ReInvite event) {

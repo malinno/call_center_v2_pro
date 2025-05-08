@@ -12,7 +12,8 @@ import 'src/about.dart';
 import 'src/callscreen.dart';
 import 'src/dialpad.dart';
 import 'src/register.dart';
-
+import 'src/intro_screen.dart';
+import 'src/main_tabs.dart';
 void main() {
   Logger.level = Level.warning;
   if (WebRTC.platformIsDesktop) {
@@ -33,6 +34,8 @@ typedef PageContentBuilder = Widget Function(
 class MyApp extends StatelessWidget {
   final SIPUAHelper _helper = SIPUAHelper();
   Map<String, PageContentBuilder> routes = {
+    '/home': ([SIPUAHelper? helper, Object? arguments]) => MainTabs(helper),
+    '/intro': ([SIPUAHelper? helper, Object? arguments]) => IntroScreen(),
     '/': ([SIPUAHelper? helper, Object? arguments]) => DialPadWidget(helper),
     '/register': ([SIPUAHelper? helper, Object? arguments]) =>
         RegisterWidget(helper),
@@ -68,9 +71,9 @@ class MyApp extends StatelessWidget {
             create: (context) => SipUserCubit(sipHelper: _helper)),
       ],
       child: MaterialApp(
-        title: 'Flutter Demo',
+        title: 'SOLY',
         theme: Provider.of<ThemeProvider>(context).currentTheme,
-        initialRoute: '/',
+        initialRoute: '/intro',
         onGenerateRoute: _onGenerateRoute,
       ),
     );
