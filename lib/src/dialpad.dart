@@ -7,9 +7,8 @@ import 'package:sip_ua/sip_ua.dart';
 import 'call_history.dart';
 
 class DialPadWidget extends StatefulWidget {
-  final SIPUAHelper? helper;
-  DialPadWidget(this.helper, {Key? key}) : super(key: key);
-
+  final SIPUAHelper helper;
+  const DialPadWidget({Key? key, required this.helper}) : super(key: key);
   @override
   _DialPadWidgetState createState() => _DialPadWidgetState();
 }

@@ -2,9 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'models/zsolution_user.dart';
+import 'package:provider/provider.dart';
+import 'package:sip_ua/sip_ua.dart';
 
 class AccountWidget extends StatefulWidget {
-  const AccountWidget({Key? key}) : super(key: key);
+  final SIPUAHelper? helper;
+  const AccountWidget({Key? key, this.helper}) : super(key: key);
 
   @override
   State<AccountWidget> createState() => _AccountWidgetState();
@@ -25,14 +28,21 @@ class _AccountWidgetState extends State<AccountWidget> {
   Future<void> _loadAccount() async {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
-      // Load ZSolution user data if exists
       final zsolutionUserJson = prefs.getString('zsolution_user');
+      print('Loading zsolution_user from SharedPreferences:');
+      print('Raw JSON: $zsolutionUserJson');
       if (zsolutionUserJson != null && zsolutionUserJson.isNotEmpty) {
         try {
           final Map<String, dynamic> jsonData = jsonDecode(zsolutionUserJson);
+          print('Parsed JSON data: $jsonData');
           _zsolutionUser = ZSolutionUser.fromJson(jsonData);
+          print('Parsed user data:');
+          print('Host: ${_zsolutionUser?.host}');
+          print('Extension: ${_zsolutionUser?.extension}');
+          print('Password: ${_zsolutionUser?.pass}');
           _isZSolutionLogin = true;
         } catch (e) {
+          print('Error parsing zsolution_user: $e');
           _isZSolutionLogin = false;
         }
       } else {
@@ -46,14 +56,20 @@ class _AccountWidgetState extends State<AccountWidget> {
   Future<void> _logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('is_logged_in', false);
-    await prefs.remove('auth_user');
-    await prefs.remove('ws_uri');
-    await prefs.remove('password');
     await prefs.remove('zsolution_token');
     await prefs.remove('zsolution_user');
-    if (mounted) {
-      Navigator.pushNamedAndRemoveUntil(context, '/register', (route) => false);
-    }
+    try {
+        if (widget.helper != null) {
+          if (widget.helper!.registerState.state == RegistrationStateEnum.REGISTERED) {
+            widget.helper!.unregister();
+          }
+          widget.helper!.stop();
+        }
+      } catch (e) {
+        print('Error during logout: $e');
+      }
+
+   Navigator.pushReplacementNamed(context, '/intro');
   }
 
   @override
@@ -77,6 +93,15 @@ class _AccountWidgetState extends State<AccountWidget> {
                     style: TextStyle(color: Colors.white70, fontSize: 18)),
                 SizedBox(height: 8),
                 Text('Role: ${_zsolutionUser!.roleName}', 
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+                SizedBox(height: 8),
+                Text('Host: ${_zsolutionUser!.host ?? ""}',
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+                SizedBox(height: 8),
+                Text('Extension: ${_zsolutionUser!.extension ?? ""}',
+                    style: TextStyle(color: Colors.white70, fontSize: 18)),
+                SizedBox(height: 8),
+                Text('Password: ${_zsolutionUser!.pass ?? ""}',
                     style: TextStyle(color: Colors.white70, fontSize: 18)),
               ] else ...[
                 Text('Username: $_username', 

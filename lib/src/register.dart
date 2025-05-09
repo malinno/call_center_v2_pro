@@ -14,9 +14,9 @@ import 'package:flutter/services.dart';
 import 'dart:ui';
 
 class RegisterWidget extends StatefulWidget {
-  final SIPUAHelper? _helper;
+  final SIPUAHelper helper;
 
-  RegisterWidget(this._helper, {Key? key}) : super(key: key);
+  const RegisterWidget(this.helper, {Key? key}) : super(key: key);
 
   @override
   State<RegisterWidget> createState() => _RegisterWidgetState();
@@ -30,6 +30,8 @@ class _RegisterWidgetState extends State<RegisterWidget>
   final TextEditingController _zsolutionEmailController = TextEditingController();
   final TextEditingController _zsolutionPasswordController = TextEditingController();
   bool _showZSolutionForm = false;
+  bool _obscurePassword = true;
+  bool _rememberMe = false;
 
   late SharedPreferences _preferences;
   late RegistrationState _registerState;
@@ -44,7 +46,6 @@ class _RegisterWidgetState extends State<RegisterWidget>
   };
 
   late SipUserCubit currentUser;
-  SIPUAHelper? get helper => widget._helper;
 
   final _formKey = GlobalKey<FormState>();
 
@@ -63,6 +64,8 @@ class _RegisterWidgetState extends State<RegisterWidget>
     _passwordController.dispose();
     _zsolutionEmailController.dispose();
     _zsolutionPasswordController.dispose();
+    widget.helper.stop();
+    widget.helper.removeSipUaHelperListener(this);
     super.dispose();
   }
 
@@ -79,6 +82,7 @@ class _RegisterWidgetState extends State<RegisterWidget>
       _serverController.text = _preferences.getString('ws_uri') ?? '';
       _usernameController.text = _preferences.getString('auth_user') ?? '';
       _passwordController.text = _preferences.getString('password') ?? '';
+      _rememberMe = _preferences.getBool('remember_me') ?? false;
     });
   }
 
@@ -86,6 +90,7 @@ class _RegisterWidgetState extends State<RegisterWidget>
     _preferences.setString('ws_uri', _serverController.text);
     _preferences.setString('auth_user', _usernameController.text);
     _preferences.setString('password', _passwordController.text);
+    _preferences.setBool('remember_me', _rememberMe);
   }
 
   @override
@@ -93,10 +98,20 @@ class _RegisterWidgetState extends State<RegisterWidget>
     if (mounted) setState(() => _registerState = state);
     Navigator.of(context, rootNavigator: true).pop();
     if (state.state == RegistrationStateEnum.REGISTERED) {
+      if (_rememberMe) {
+        _saveSettings();
+      } else {
+        _preferences.remove('ws_uri');
+        _preferences.remove('auth_user');
+        _preferences.remove('password');
+        _preferences.remove('remember_me');
+      }
       _preferences.setBool('is_logged_in', true);
       ScaffoldMessenger.of(context)
           .showSnackBar(SnackBar(content: Text('Đăng ký thành công')));
-      Navigator.pushReplacementNamed(context, '/home');
+      Future.delayed(Duration.zero, () {
+        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      });
     } else if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
       Fluttertoast.showToast(
         msg: "Đăng ký thất bại. Vui lòng kiểm tra lại",
@@ -152,86 +167,107 @@ class _RegisterWidgetState extends State<RegisterWidget>
       ),
     );
 
-    currentUser.register(SipUser(
-      selectedTransport: _transport,
-      wsUrl: wsUrl,
-      wsExtraHeaders: _wsExtraHeaders,
-      sipUri: sipUri,
-      port: port,
-      displayName: user,
-      authUser: user,
-      password: pass,
-    ));
+    if (helper != null) {
+      widget.helper.stop()
+      currentUser.register(SipUser(
+          selectedTransport: _transport,
+          wsUrl: wsUrl,
+          wsExtraHeaders: _wsExtraHeaders,
+          sipUri: sipUri,
+          port: port,
+          displayName: user,
+          authUser: user,
+          password: pass,
+        ));
+    
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     currentUser = context.watch<SipUserCubit>();
     return Scaffold(
-      backgroundColor: Colors.transparent,
+      backgroundColor: const Color(0xFFF6F7FB),
       body: Stack(
         children: [
-          // Top illustration with white blur background
+          // Header gradient background
           Container(
-            height: 250,
+            height: 350,
             width: double.infinity,
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.13),
-              // Không gradient, chỉ nền trắng mờ
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                colors: [Color(0xFF6A5AE0), Color(0xFF6A5AE0), Color(0xFFB16CEA)],
+                begin: Alignment.topCenter,
+                end: Alignment.center,
+              ),
             ),
-            child: Image.asset(
-              'lib/src/assets/logo.png',
-              fit: BoxFit.contain,
-              alignment: Alignment.topCenter,
+            child: SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Text(
+                      'ZSolution',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 36,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.2,
+                        fontFamily: 'Poppins',
+                        shadows: [
+                          Shadow(
+                            color: Colors.black.withOpacity(0.5),
+                            offset: Offset(2, 2),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-          // Form card with gradient background
+          // Login Card
           Align(
             alignment: Alignment.bottomCenter,
             child: SingleChildScrollView(
               child: Container(
-                margin: const EdgeInsets.only(top: 140),
                 width: double.infinity,
                 child: ClipRRect(
                   borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(40),
-                    topRight: Radius.circular(40),
+                    topLeft: Radius.circular(32),
+                    topRight: Radius.circular(32),
                   ),
-                  child: BackdropFilter(
-                    filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 36),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Color(0xFF2B133D), Color(0xFF1C0528)],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(40),
-                          topRight: Radius.circular(40),
-                        ),
-                      ),
+                  child: Container(
+                    color: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                    child: SingleChildScrollView(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const SizedBox(height: 16),
-                          Text(
-                            'Xin chào!',
-                            style: TextStyle(
-                              fontSize: 32,
-                              fontWeight: FontWeight.bold,
-                              color: Colors.white,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Chào bạn đến với soly',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: Colors.white70,
-                              fontWeight: FontWeight.w400,
+                          Center(
+                            child: Column(
+                              children: const [
+                                Text(
+                                  'Chào mừng bạn đến với ZSolution',
+                                  style: TextStyle(
+                                    fontSize: 20,
+                                    fontWeight: FontWeight.bold,
+                                    color: Color(0xFF2B133D),
+                                  ),
+                                ),
+                                SizedBox(height: 6),
+                                Text(
+                                  'Nhập thông tin của bạn dưới đây',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.black54,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                           const SizedBox(height: 32),
@@ -239,146 +275,154 @@ class _RegisterWidgetState extends State<RegisterWidget>
                             key: _formKey,
                             child: Column(
                               children: [
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text('Server', style: TextStyle(color: Colors.white70)),
-                                ),
-                                const SizedBox(height: 8),
                                 TextFormField(
                                   controller: _serverController,
-                                  validator: (value) => value == null || value.isEmpty ? 'Server không được để trống' : null,
+                                  validator: (value) => value == null || value.isEmpty ? 'Server là bắt buộc' : null,
                                   decoration: InputDecoration(
-                                    prefixIcon: Icon(Icons.cloud, color: Colors.white54),
-                                    hintText: 'Server',
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.08),
+                                    labelText: 'Nhập server',
+                                    prefixIcon: const Icon(Icons.cloud_outlined),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                      borderSide: BorderSide.none,
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                    hintStyle: TextStyle(color: Colors.white38),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF6F7FB),
                                   ),
-                                  style: TextStyle(color: Colors.white),
                                 ),
                                 const SizedBox(height: 20),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text('Username', style: TextStyle(color: Colors.white70)),
-                                ),
-                                const SizedBox(height: 8),
                                 TextFormField(
                                   controller: _usernameController,
-                                  validator: (value) => value == null || value.isEmpty ? 'Username không được để trống' : null,
+                                  validator: (value) => value == null || value.isEmpty ? 'Tên tài khoản là bắt buộc' : null,
                                   decoration: InputDecoration(
-                                    prefixIcon: Icon(Icons.person, color: Colors.white54),
-                                    hintText: 'Username',
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.08),
+                                    labelText: 'Nhập tên tài khoản',
+                                    prefixIcon: const Icon(Icons.person_outline),
                                     border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                      borderSide: BorderSide.none,
+                                      borderRadius: BorderRadius.circular(16),
                                     ),
-                                    hintStyle: TextStyle(color: Colors.white38),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF6F7FB),
                                   ),
-                                  style: TextStyle(color: Colors.white),
                                 ),
                                 const SizedBox(height: 20),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Text('Password', style: TextStyle(color: Colors.white70)),
-                                ),
-                                const SizedBox(height: 8),
                                 TextFormField(
                                   controller: _passwordController,
-                                  obscureText: true,
-                                  validator: (value) => value == null || value.isEmpty ? 'Password không được để trống' : null,
+                                  obscureText: _obscurePassword,
+                                  validator: (value) => value == null || value.isEmpty ? 'Mật khẩu là bắt buộc ' : null,
                                   decoration: InputDecoration(
-                                    prefixIcon: Icon(Icons.vpn_key, color: Colors.white54),
-                                    hintText: 'Password',
-                                    filled: true,
-                                    fillColor: Colors.white.withOpacity(0.08),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(18),
-                                      borderSide: BorderSide.none,
+                                    labelText: 'Nhập mật khẩu của bạn',
+                                    prefixIcon: const Icon(Icons.lock_outline),
+                                    suffixIcon: IconButton(
+                                      icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
+                                      onPressed: () {
+                                        setState(() {
+                                          _obscurePassword = !_obscurePassword;
+                                        });
+                                      },
                                     ),
-                                    hintStyle: TextStyle(color: Colors.white38),
+                                    border: OutlineInputBorder(
+                                      borderRadius: BorderRadius.circular(16),
+                                    ),
+                                    filled: true,
+                                    fillColor: const Color(0xFFF6F7FB),
                                   ),
-                                  style: TextStyle(color: Colors.white),
+                                ),
+                                const SizedBox(height: 24),
+                                Align(
+                                  alignment: Alignment.centerRight,
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Checkbox(
+                                        value: _rememberMe,
+                                        onChanged: (value) {
+                                          setState(() {
+                                            _rememberMe = value ?? false;
+                                          });
+                                        },
+                                      ),
+                                      const Text('Lưu tài khoản'),
+                                    ],
+                                  ),
                                 ),
                                 const SizedBox(height: 24),
                                 SizedBox(
                                   width: double.infinity,
-                                  height: 48,
-                                  child: Container(
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: [Color(0xFFB621FE), Color(0xFF1FD1F9)],
-                                        begin: Alignment.centerLeft,
-                                        end: Alignment.centerRight,
+                                  height: 52,
+                                  child: ElevatedButton(
+                                    onPressed: () {
+                                      if (_formKey.currentState!.validate()) {
+                                        _register();
+                                      }
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      padding: EdgeInsets.zero,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(16),
                                       ),
-                                      borderRadius: BorderRadius.circular(24),
+                                      elevation: 0,
                                     ),
-                                    child: ElevatedButton(
-                                      onPressed: () {
-                                        if (_formKey.currentState!.validate()) {
-                                          _register();
-                                        }
-                                      },
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.transparent,
-                                        shadowColor: Colors.transparent,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(24),
+                                    child: Ink(
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: [Color(0xFF6A5AE0), Color(0xFFB16CEA)],
+                                          begin: Alignment.centerLeft,
+                                          end: Alignment.centerRight,
                                         ),
-                                        elevation: 0,
+                                        borderRadius: BorderRadius.all(Radius.circular(16)),
                                       ),
-                                      child: Text(
-                                        'Đăng nhập',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
+                                      child: Container(
+                                        alignment: Alignment.center,
+                                        child: const Text(
+                                          'Đăng Nhập',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                 ),
-                                const SizedBox(height: 24),
+                                const SizedBox(height: 18),
+                               
+                                const SizedBox(height: 8),
                                 Row(
-                                  children: [
-                                    Expanded(child: Divider(color: Colors.white24)),
+                                  children: const [
+                                    Expanded(child: Divider()),
                                     Padding(
-                                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                                      child: Text('Đăng nhập với', style: TextStyle(color: Colors.white54)),
+                                      padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                      child: Text('Hoặc đăng nhập với', style: TextStyle(color: Colors.black45)),
                                     ),
-                                    Expanded(child: Divider(color: Colors.white24)),
+                                    Expanded(child: Divider()),
                                   ],
                                 ),
-                                const SizedBox(height: 20),
-                                Center(
-                                  child: GestureDetector(
-                                    onTap: () {
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      final zSolutionHelper = Provider.of<SIPUAHelper>(
+                                      context,
+                                      listen: false,
+                                    );
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(
                                           builder: (context) => ZSolutionLoginWidget(
-                                            helper: widget._helper,
+                                            helper: zSolutionHelper,
                                           ),
                                         ),
                                       );
                                     },
-                                    child: Container(
-                                      width: 56,
-                                      height: 56,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.12),
-                                        borderRadius: BorderRadius.circular(16),
-                                        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1.2),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Image.asset('lib/src/assets/Soly.png'),
-                                      ),
+                                    child: const Text(
+                                      'Đăng nhập với ZSolution',
+                                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Color(0xFFE0E0E0)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      backgroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
                                     ),
                                   ),
                                 ),

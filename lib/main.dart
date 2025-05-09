@@ -21,14 +21,14 @@ void main() {
   if (WebRTC.platformIsDesktop) {
     debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
   }
-  final SIPUAHelper normalHelper = SIPUAHelper();
-  final SIPUAHelper zSolutionHelper = SIPUAHelper();
+  final SIPUAHelper _normalHelper = SIPUAHelper();
+  final SIPUAHelper _zSolutionHelper = SIPUAHelper();
   
-  runApp(
+ runApp(
     MultiProvider(
       providers: [
-        Provider<SIPUAHelper>.value(value: normalHelper),
-        Provider<SIPUAHelper>.value(value: zSolutionHelper),
+        Provider<SIPUAHelper>.value(value: _normalHelper),
+        Provider<SIPUAHelper>.value(value: _zSolutionHelper),
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
       ],
       child: MyApp(),
@@ -43,11 +43,14 @@ typedef PageContentBuilder = Widget Function(
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final SIPUAHelper helper = Provider.of<SIPUAHelper>(context, listen: false);
+    final normalHelper = Provider.of<SIPUAHelper>(context);
+    final zSolutionHelper = Provider.of<SIPUAHelper>(context);
+    final SIPUAHelper helper = normalHelper;
+
     return MultiProvider(
       providers: [
         Provider<SipUserCubit>(
-            create: (context) => SipUserCubit(sipHelper: helper)),
+            create: (context) => SipUserCubit(sipHelper: normalHelper)),
       ],
       child: MaterialApp(
         title: 'SOLY',
@@ -55,6 +58,7 @@ class MyApp extends StatelessWidget {
         initialRoute: '/intro',
         onGenerateRoute: (settings) {
           final String? name = settings.name;
+          
           final Map<String, PageContentBuilder> routes = {
             '/home': ([SIPUAHelper? h, Object? arguments]) {
               if (arguments is SIPUAHelper) {
@@ -63,8 +67,9 @@ class MyApp extends StatelessWidget {
               return MainTabs(h);
             },
             '/intro': ([SIPUAHelper? h, Object? arguments]) => IntroScreen(),
-            '/': ([SIPUAHelper? h, Object? arguments]) => DialPadWidget(h),
-            '/register': ([SIPUAHelper? h, Object? arguments]) => RegisterWidget(h),
+            '/': ([SIPUAHelper? h, Object? arguments]) => DialPadWidget(helper: h ?? normalHelper),
+           '/register': ([SIPUAHelper? h, Object? arguments]) => RegisterWidget(h ?? normalHelper),
+            '/zsolution': ([SIPUAHelper? h, Object? arguments]) => ZSolutionLoginWidget(helper: zSolutionHelper),
             '/callscreen': ([SIPUAHelper? h, Object? arguments]) => CallScreenWidget(h, settings.arguments as Call?),
             '/about': ([SIPUAHelper? h, Object? arguments]) => AboutWidget(),
           };

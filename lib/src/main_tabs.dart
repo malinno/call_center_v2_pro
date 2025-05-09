@@ -19,7 +19,7 @@ class _MainTabsState extends State<MainTabs> {
   @override
   Widget build(BuildContext context) {
     final screens = [
-      DialPadWidget(widget.helper),     
+      DialPadWidget(helper: widget.helper),     
       CallHistoryWidget(),              
       AccountWidget(),
     ];

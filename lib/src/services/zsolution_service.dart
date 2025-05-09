@@ -79,9 +79,13 @@ class ZSolutionService {
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
+        print('Login API Response: $jsonResponse'); // Debug print
         if (jsonResponse['code'] == 200) {
-          _token = jsonResponse['token'];
-          return ZSolutionUser.fromJson(jsonResponse);
+          _token = jsonResponse['data']['token'];
+          // Get user data from the correct nested structure
+          final userData = jsonResponse['data']['user'];
+          print('User data to parse: $userData'); // Debug print
+          return ZSolutionUser.fromJson(userData);
         } else {
           throw Exception(jsonResponse['message'] ?? 'Đăng nhập thất bại');
         }

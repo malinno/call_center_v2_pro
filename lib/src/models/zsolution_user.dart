@@ -1,35 +1,34 @@
 class ZSolutionUser {
-  final int id;
-  final String userName;
-  final String email;
-  final String roleName;
+  final int? id;
+  final String? userName;
+  final String? email;
+  final String? roleName;
   final String? extension;
   final String? host;
   final String? pass;
-  final String token;
+  final String? token;
 
   ZSolutionUser({
-    required this.id,
-    required this.userName,
-    required this.email,
-    required this.roleName,
+    this.id,
+    this.userName,
+    this.email,
+    this.roleName,
     this.extension,
     this.host,
     this.pass,
-    required this.token,
+    this.token,
   });
 
   factory ZSolutionUser.fromJson(Map<String, dynamic> json) {
-    final userData = json['data']['user'];
     return ZSolutionUser(
-      id: userData['id'],
-      userName: userData['userName'] ?? '',
-      email: userData['email'] ?? '',
-      roleName: userData['roleName'] ?? '',
-      extension: userData['extension'],
-      host: userData['host'],
-      pass: userData['pass'],
-      token: json['data']['token'],
+      id: json['id'],
+      userName: json['userName'],
+      email: json['email'],
+      roleName: json['roleName'],
+      extension: json['extension'],
+      host: json['host'],
+      pass: json['pass'],
+      token: json['token'],
     );
   }
 
