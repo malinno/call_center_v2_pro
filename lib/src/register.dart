@@ -35,6 +35,7 @@ class _RegisterWidgetState extends State<RegisterWidget>
 
   late SharedPreferences _preferences;
   late RegistrationState _registerState;
+  late UaSettings _sipSettings;
 
   // Luôn dùng WebSocket
   final TransportType _transport = TransportType.WS;
@@ -52,8 +53,8 @@ class _RegisterWidgetState extends State<RegisterWidget>
   @override
   void initState() {
     super.initState();
-    _registerState = helper!.registerState;
-    helper!.addSipUaHelperListener(this);
+    _registerState = widget.helper.registerState;
+    widget.helper.addSipUaHelperListener(this);
     _loadSettings();
   }
 
@@ -64,14 +65,13 @@ class _RegisterWidgetState extends State<RegisterWidget>
     _passwordController.dispose();
     _zsolutionEmailController.dispose();
     _zsolutionPasswordController.dispose();
-    widget.helper.stop();
     widget.helper.removeSipUaHelperListener(this);
     super.dispose();
   }
 
   @override
   void deactivate() {
-    helper!.removeSipUaHelperListener(this);
+    widget.helper.removeSipUaHelperListener(this);
     _saveSettings();
     super.deactivate();
   }
@@ -95,9 +95,13 @@ class _RegisterWidgetState extends State<RegisterWidget>
 
   @override
   void registrationStateChanged(RegistrationState state) {
-    if (mounted) setState(() => _registerState = state);
-    Navigator.of(context, rootNavigator: true).pop();
+    print('Registration State Changed: ${state.state}');
+    if (!mounted) return;
+
+    setState(() => _registerState = state);
+    
     if (state.state == RegistrationStateEnum.REGISTERED) {
+      print('Đăng ký SIP thành công!');
       if (_rememberMe) {
         _saveSettings();
       } else {
@@ -107,17 +111,56 @@ class _RegisterWidgetState extends State<RegisterWidget>
         _preferences.remove('remember_me');
       }
       _preferences.setBool('is_logged_in', true);
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text('Đăng ký thành công')));
-      Future.delayed(Duration.zero, () {
-        Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+      
+      // Đóng dialog loading nếu đang mở
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      
+      // Hiển thị thông báo thành công
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Đăng ký thành công'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Chuyển sang màn hình chính
+      print('Đang chuyển sang màn hình chính...');
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.pushReplacementNamed(
+            context,
+            '/home',
+            arguments: widget.helper,
+          );
+        }
       });
     } else if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
+      print('Đăng ký SIP thất bại: ${state.cause}');
+      // Đóng dialog loading nếu đang mở
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
       Fluttertoast.showToast(
-        msg: "Đăng ký thất bại. Vui lòng kiểm tra lại",
+        msg: "Đăng ký thất bại: ${state.cause}",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.BOTTOM,
         backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 16.0,
+      );
+    } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
+      print('Đăng ký SIP bị hủy');
+      // Đóng dialog loading nếu đang mở
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      Fluttertoast.showToast(
+        msg: "Đăng ký bị hủy",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.orange,
         textColor: Colors.white,
         fontSize: 16.0,
       );
@@ -140,6 +183,45 @@ class _RegisterWidgetState extends State<RegisterWidget>
     );
   }
 
+  @override
+  void transportStateChanged(TransportState state) {
+    print('Transport State Changed: ${state.state}');
+    if (state.state == TransportStateEnum.CONNECTED) {
+      print('Transport connected, attempting to register...');
+      // Đợi một chút để đảm bảo kết nối ổn định
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          try {
+            if (_sipSettings != null) {
+              widget.helper.register();
+            } else {
+              print('No SIP settings available, cannot register');
+            }
+          } catch (e) {
+            print('Registration failed: $e');
+          }
+        }
+      });
+    } else if (state.state == TransportStateEnum.DISCONNECTED) {
+      print('Transport disconnected, attempting to reconnect...');
+      // Thử kết nối lại sau 1 giây
+      Future.delayed(Duration(seconds: 1), () {
+        if (mounted) {
+          try {
+            if (_sipSettings != null) {
+              print('Attempting to reconnect with saved settings...');
+              widget.helper.start(_sipSettings);
+            } else {
+              print('No SIP settings available, cannot reconnect');
+            }
+          } catch (e) {
+            print('Reconnection failed: $e');
+          }
+        }
+      });
+    }
+  }
+
   void _register() {
     final server = _serverController.text.trim();
     final user = _usernameController.text.trim();
@@ -151,6 +233,12 @@ class _RegisterWidgetState extends State<RegisterWidget>
     const port = '8089';
     final wsUrl = 'wss://$server:$port/ws';
     final sipUri = '$user@$server';
+
+    print('Bắt đầu đăng ký SIP...');
+    print('Server: $server');
+    print('Username: $user');
+    print('WebSocket URL: $wsUrl');
+    print('SIP URI: $sipUri');
 
     _saveSettings();
     showDialog(
@@ -167,19 +255,79 @@ class _RegisterWidgetState extends State<RegisterWidget>
       ),
     );
 
-    if (helper != null) {
-      widget.helper.stop()
-      currentUser.register(SipUser(
-          selectedTransport: _transport,
-          wsUrl: wsUrl,
-          wsExtraHeaders: _wsExtraHeaders,
-          sipUri: sipUri,
-          port: port,
-          displayName: user,
-          authUser: user,
-          password: pass,
-        ));
-    
+    try {
+      // Dừng kết nối cũ nếu tồn tại
+      if (widget.helper.registerState.state == RegistrationStateEnum.REGISTERED) {
+        print('Đang hủy đăng ký SIP cũ...');
+        widget.helper.unregister();
+      }
+      
+      // Kiểm tra trạng thái kết nối thông qua registerState
+      if (widget.helper.registerState.state != RegistrationStateEnum.NONE) {
+        print('Đang dừng kết nối SIP cũ...');
+        widget.helper.stop();
+      }
+
+      // Đợi một chút để đảm bảo kết nối cũ đã dừng
+      Future.delayed(Duration(seconds: 1)).then((_) {
+        print('Khởi tạo kết nối SIP mới...');
+        _sipSettings = UaSettings();
+        _sipSettings.webSocketUrl = wsUrl;
+        _sipSettings.uri = 'sip:$sipUri';
+        _sipSettings.authorizationUser = user;
+        _sipSettings.password = pass;
+        _sipSettings.displayName = user;
+        _sipSettings.userAgent = 'ZSolutionSoftphone';
+        _sipSettings.transportType = _transport;
+        _sipSettings.register = true; // Đảm bảo tự động đăng ký
+        _sipSettings.register_expires = 300; // Thời gian hết hạn đăng ký (5 phút)
+
+        print('Cấu hình SIP với:');
+        print('webSocketUrl: ${_sipSettings.webSocketUrl}');
+        print('uri: ${_sipSettings.uri}');
+        print('authorizationUser: ${_sipSettings.authorizationUser}');
+        print('password: ${_sipSettings.password}');
+
+        try {
+          widget.helper.start(_sipSettings).then((_) {
+            print('SIP đã khởi động, đợi kết nối WebSocket...');
+            // Không gọi register() ở đây nữa, sẽ được gọi trong transportStateChanged
+          }).catchError((e) {
+            print('Lỗi khởi động SIP: $e');
+            if (mounted) {
+              Navigator.of(context).pop(); // Đóng dialog loading
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Lỗi kết nối: ${e.toString()}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          });
+        } catch (e) {
+          print('Lỗi khởi động SIP: $e');
+          if (mounted) {
+            Navigator.of(context).pop(); // Đóng dialog loading
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Lỗi kết nối: ${e.toString()}'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+        }
+      });
+    } catch (e) {
+      print('Lỗi đăng ký SIP: $e');
+      if (mounted) {
+        Navigator.of(context).pop(); // Đóng dialog loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi đăng ký: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
@@ -359,8 +507,9 @@ class _RegisterWidgetState extends State<RegisterWidget>
                                         borderRadius: BorderRadius.circular(16),
                                       ),
                                       elevation: 0,
+                                      backgroundColor: Colors.transparent,
                                     ),
-                                    child: Ink(
+                                    child: Container(
                                       decoration: const BoxDecoration(
                                         gradient: LinearGradient(
                                           colors: [Color(0xFF6A5AE0), Color(0xFFB16CEA)],
@@ -369,15 +518,14 @@ class _RegisterWidgetState extends State<RegisterWidget>
                                         ),
                                         borderRadius: BorderRadius.all(Radius.circular(16)),
                                       ),
-                                      child: Container(
-                                        alignment: Alignment.center,
-                                        child: const Text(
-                                          'Đăng Nhập',
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                            color: Colors.white,
-                                          ),
+                                      alignment: Alignment.center,
+                                      child: const Text(
+                                        'Đăng Nhập',
+                                        style: TextStyle(
+                                          fontSize: 18,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                          inherit: false,
                                         ),
                                       ),
                                     ),
@@ -444,8 +592,6 @@ class _RegisterWidgetState extends State<RegisterWidget>
 
   @override
   void callStateChanged(Call call, CallState state) {}
-  @override
-  void transportStateChanged(TransportState state) {}
   @override
   void onNewMessage(SIPMessageRequest msg) {}
   @override

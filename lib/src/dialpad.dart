@@ -14,8 +14,9 @@ class DialPadWidget extends StatefulWidget {
 }
 
 class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperListener {
-  late TextEditingController _textController;
-  late SharedPreferences _preferences;
+  final TextEditingController _numberController = TextEditingController();
+  bool _isRegistered = false;
+  bool _isRegistering = false;
 
   // Key definitions
   final List<List<Map<String, String>>> _keys = const [
@@ -28,94 +29,134 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
   @override
   void initState() {
     super.initState();
-    _textController = TextEditingController();
-    widget.helper?.addSipUaHelperListener(this);
-    _loadDest();
-  }
-
-  Future<void> _loadDest() async {
-    _preferences = await SharedPreferences.getInstance();
-    setState(() => _textController.clear());
+    widget.helper.addSipUaHelperListener(this);
+    _isRegistered = widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
+    print('DialPad initState - Current registration state: ${widget.helper.registerState.state}');
   }
 
   @override
   void dispose() {
-    widget.helper?.removeSipUaHelperListener(this);
-    _textController.dispose();
+    _numberController.dispose();
+    widget.helper.removeSipUaHelperListener(this);
     super.dispose();
   }
 
-  void _append(String num) {
+  @override
+  void registrationStateChanged(RegistrationState state) {
+    print('DialPad - Registration State Changed: ${state.state}');
     setState(() {
-      _textController.text += num;
+      _isRegistered = state.state == RegistrationStateEnum.REGISTERED;
+      _isRegistering = false;
     });
+
+    if (state.state == RegistrationStateEnum.UNREGISTERED || 
+        state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
+      print('DialPad - Not registered, waiting for transport to reconnect...');
+      _isRegistering = true;
+      // Không thử đăng ký lại ngay lập tức, đợi transport kết nối lại
+    }
   }
 
-  void _backspace() {
-    final text = _textController.text;
-    if (text.isNotEmpty) {
-      setState(() {
-        _textController.text = text.substring(0, text.length - 1);
+  @override
+  void transportStateChanged(TransportState state) {
+    print('DialPad - Transport State Changed: ${state.state}');
+    if (state.state == TransportStateEnum.CONNECTED && !_isRegistered && !_isRegistering) {
+      print('DialPad - Transport connected, attempting to register...');
+      _isRegistering = true;
+      // Đợi một chút để đảm bảo kết nối ổn định
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          try {
+            widget.helper.register();
+          } catch (e) {
+            print('DialPad - Registration failed: $e');
+            _isRegistering = false;
+          }
+        }
+      });
+    } else if (state.state == TransportStateEnum.DISCONNECTED) {
+      print('DialPad - Transport disconnected, attempting to reconnect...');
+      // Thử kết nối lại sau 1 giây
+      Future.delayed(Duration(seconds: 1), () {
+        if (mounted) {
+          try {
+            // Không thử đăng ký lại khi đã ngắt kết nối
+            print('DialPad - Connection lost, waiting for transport to reconnect...');
+          } catch (e) {
+            print('DialPad - Reconnection failed: $e');
+          }
+        }
       });
     }
   }
 
-  Future<void> _call({required bool video}) async {
-    print('Gọi tới: ${_textController.text}');
-    String dest = _textController.text;
-    print('Gọi tới: $dest');
-    if (dest.isEmpty) return;
-
-    // Kiểm tra trạng thái kết nối SIP
-    if (widget.helper?.registerState.state != RegistrationStateEnum.REGISTERED) {
-      if (!mounted) return;
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (BuildContext context) {
-          return AlertDialog(
-            backgroundColor: Colors.black87,
-            title: Text(
-              'Không thể thực hiện cuộc gọi',
-              style: TextStyle(color: Colors.white),
-            ),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Chưa kết nối được với máy chủ SIP.',
-                  style: TextStyle(color: Colors.white70),
-                ),
-                SizedBox(height: 16),
-                Text(
-                  'Vui lòng kiểm tra lại kết nối mạng và thử lại.',
-                  style: TextStyle(color: Colors.white70, fontSize: 12),
-                ),
-              ],
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  'Đóng',
-                  style: TextStyle(color: Colors.blue),
-                ),
-              ),
-            ],
-          );
-        },
+  Future<void> _call() async {
+    final number = _numberController.text;
+    if (number.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Vui lòng nhập số điện thoại')),
       );
       return;
     }
 
-    if (defaultTargetPlatform == TargetPlatform.android ||
-        defaultTargetPlatform == TargetPlatform.iOS) {
-      await Permission.microphone.request();
-      await Permission.camera.request();
+    if (!_isRegistered) {
+      print('DialPad - Not registered, attempting to register before call...');
+      _isRegistering = true;
+      try {
+        widget.helper.register();
+        // Đợi đăng ký thành công
+        await Future.delayed(Duration(seconds: 2));
+        if (!_isRegistered) {
+          throw Exception('Không thể đăng ký SIP');
+        }
+      } catch (e) {
+        print('DialPad - Registration failed: $e');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể kết nối SIP. Vui lòng thử lại.')),
+        );
+        return;
+      }
     }
-    widget.helper?.call(dest, voiceOnly: !video);
-    _preferences.setString('dest', dest);
+
+    try {
+      final call = await widget.helper.call(
+        number,
+        voiceOnly: true,
+        headers: [
+          'X-Feature-Level: 1',
+          'X-Feature-Code: basic',
+        ],
+      );
+      Navigator.pushNamed(context, '/callscreen', arguments: call);
+    } catch (e) {
+      print('DialPad - Call failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Không thể thực hiện cuộc gọi. Vui lòng thử lại.')),
+      );
+    }
+  }
+
+  void _append(String digit) {
+    if (!_isRegistered && !_isRegistering) {
+      print('DialPad - Not registered, attempting to register before append...');
+      _isRegistering = true;
+      // Đợi một chút trước khi thử đăng ký lại
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          widget.helper.register();
+        }
+      });
+    }
+    _numberController.text += digit;
+  }
+
+  void _backspace() {
+    final text = _numberController.text;
+    if (text.isNotEmpty) {
+      setState(() {
+        _numberController.text = text.substring(0, text.length - 1);
+      });
+    }
   }
 
   Widget _buildButton(Map<String, String> keyData) {
@@ -164,12 +205,12 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
           children: [
             SizedBox(height: 10),
             Text(
-              'SIP: ${widget.helper?.registerState.state.toString()}',
+              'SIP: ${widget.helper.registerState.state.toString()}',
               style: TextStyle(color: Colors.white, fontSize: 14),
             ),
             SizedBox(height: 40),
             Text(
-              _textController.text,
+              _numberController.text,
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.white, fontSize: 36, letterSpacing: 2),
             ),
@@ -181,10 +222,7 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
               children: [
                 SizedBox(width: 70),
                 GestureDetector(
-                  onTap: () {
-                    print('Nút call đã được nhấn');
-                    _call(video: false);
-                  },
+                  onTap: _call,
                   child: Container(
                     width: 70,
                     height: 70,
@@ -193,13 +231,13 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                   ),
                 ),
                 SizedBox(width: 70,
-                  child: _textController.text.isNotEmpty
+                  child: _numberController.text.isNotEmpty
                     ? Material(
                         color: Colors.transparent,
                         child: InkWell(
                           borderRadius: BorderRadius.circular(22),
                           onTap: _backspace,
-                          onLongPress: () => setState(() => _textController.clear()),
+                          onLongPress: () => setState(() => _numberController.clear()),
                           child: Container(
                             width: 44,
                             height: 44,
@@ -223,14 +261,12 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
     );
   }
 
-  @override void registrationStateChanged(RegistrationState state) {}
-  @override void transportStateChanged(TransportState state) {}
   @override
   void callStateChanged(Call call, CallState state) async {
     if (state.state == CallStateEnum.CALL_INITIATION) {
       await saveCallHistory(call.remote_identity ?? '');
       await Navigator.pushNamed(context, '/callscreen', arguments: call);
-      setState(() => _textController.clear());
+      setState(() => _numberController.clear());
     }
     if (state.state == CallStateEnum.FAILED) {
       await saveCallHistory(call.remote_identity ?? '', missed: true);

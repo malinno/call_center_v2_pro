@@ -6,6 +6,7 @@ import 'services/zsolution_service.dart';
 import 'dart:convert';
 import 'dart:ui';
 import 'register.dart';
+import 'main_tabs.dart';
 
 class ZSolutionLoginWidget extends StatefulWidget {
   final SIPUAHelper helper;
@@ -21,40 +22,92 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
   bool _loading = false;
   final _formKey = GlobalKey<FormState>();
   bool _rememberMe = false;
-  bool get isStarted => widget.helper!.isConnected();
-  bool get isRegistered => widget.helper!.registerState.state == RegistrationStateEnum.REGISTERED;
+  bool get isStarted => widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
+  bool get isRegistered => widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
 
   @override
   void initState() {
     super.initState();
     _loadSavedAccount();
-    widget.helper?.addSipUaHelperListener(this);
+    widget.helper.addSipUaHelperListener(this);
   }
 
   @override
   void dispose() {
-    widget.helper.stop();
     widget.helper.removeSipUaHelperListener(this);
     super.dispose();
   }
 
   @override
   void registrationStateChanged(RegistrationState state) {
-    print('SIP Registration State Changed: ${state.state}');
+    print('ZSolution - Registration State Changed: ${state.state}');
+    if (!mounted) return;
+
     if (state.state == RegistrationStateEnum.REGISTERED) {
-     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Đăng ký SIP thành công!')),
-    );
-    } else if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
+      print('ZSolution - Đăng ký SIP thành công!');
       ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('Lỗi đăng ký SIP: ${state.cause}')),
-    );
+        SnackBar(
+          content: Text('Đăng ký SIP thành công!'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // Chuyển sang màn hình chính
+      print('ZSolution - Đang chuyển sang màn hình chính...');
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MainTabs(widget.helper),
+            ),
+          );
+        }
+      });
+    } else if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
+      print('ZSolution - Đăng ký SIP thất bại: ${state.cause}');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Lỗi đăng ký SIP: ${state.cause}'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
+      print('ZSolution - Đăng ký SIP bị hủy');
+      // Không hiển thị thông báo khi unregister để tránh gây nhầm lẫn
     }
   }
 
   @override
   void transportStateChanged(TransportState state) {
-    print('SIP Transport State Changed: ${state.state}');
+    print('ZSolution - Transport State Changed: ${state.state}');
+    if (state.state == TransportStateEnum.CONNECTED) {
+      print('ZSolution - Transport connected, attempting to register...');
+      // Đợi một chút để đảm bảo kết nối ổn định
+      Future.delayed(Duration(milliseconds: 500), () {
+        if (mounted) {
+          try {
+            if (widget.helper.registerState.state != RegistrationStateEnum.REGISTERED) {
+              widget.helper.register();
+            }
+          } catch (e) {
+            print('ZSolution - Registration failed: $e');
+          }
+        }
+      });
+    } else if (state.state == TransportStateEnum.DISCONNECTED) {
+      print('ZSolution - Transport disconnected, attempting to reconnect...');
+      // Thử kết nối lại sau 1 giây
+      Future.delayed(Duration(seconds: 1), () {
+        if (mounted) {
+          try {
+            print('ZSolution - Connection lost, waiting for transport to reconnect...');
+          } catch (e) {
+            print('ZSolution - Reconnection failed: $e');
+          }
+        }
+      });
+    }
   }
 
   @override
@@ -86,21 +139,36 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
     if (!_formKey.currentState!.validate()) {
       return;
     }
+
     setState(() => _loading = true);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('Đang đăng nhập...'),
+          ],
+        ),
+      ),
+    );
+
     try {
+      print('ZSolution - Bắt đầu đăng nhập...');
+      print('Email: $email');
+      
       final user = await ZSolutionService.login(email, password);
-      // Debug prints to check user data
-      print('Login successful - User data:');
+      print('ZSolution - Đăng nhập thành công!');
+      print('Thông tin user:');
       print('Host: ${user.host}');
       print('Extension: ${user.extension}');
-      print('Password: ${user.pass}');
       print('Token: ${user.token}');
 
       // Lưu thông tin user
       final prefs = await SharedPreferences.getInstance();
       final userJson = user.toJson();
-      print('Saving user data to SharedPreferences:');
-      print('User JSON: $userJson');
       await prefs.setString('zsolution_user', jsonEncode(userJson));
       if (user.token != null) {
         await prefs.setString('zsolution_token', user.token!);
@@ -116,60 +184,78 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
       }
 
       // Cấu hình lại SIPUAHelper
-    if (widget.helper != null) {
-    final settings = UaSettings();
-    settings.webSocketUrl = 'wss://${user.host}:8089/ws';
-    settings.uri = 'sip:${user.extension}@${user.host}';
-    settings.authorizationUser = user.extension;
-    settings.password = user.pass;
-    settings.displayName = user.extension;
-    settings.userAgent = 'ZSolutionSoftphone';
-    settings.transportType = TransportType.WS;
+      if (widget.helper != null) {
+        final settings = UaSettings();
+        settings.webSocketUrl = 'wss://${user.host}:8089/ws';
+        settings.uri = 'sip:${user.extension}@${user.host}';
+        settings.authorizationUser = user.extension;
+        settings.password = user.pass;
+        settings.displayName = user.extension;
+        settings.userAgent = 'ZSolutionSoftphone';
+        settings.transportType = TransportType.WS;
+        settings.register = true;
+        settings.register_expires = 300;
 
-    print('Cấu hình SIP với:');
-    print('webSocketUrl: ${settings.webSocketUrl}');
-    print('uri: ${settings.uri}');
-    print('authorizationUser: ${settings.authorizationUser}');
-    print('password: ${settings.password}');
+        print('ZSolution - Cấu hình SIP với:');
+        print('webSocketUrl: ${settings.webSocketUrl}');
+        print('uri: ${settings.uri}');
+        print('authorizationUser: ${settings.authorizationUser}');
+        print('password: ${settings.password}');
 
-    try {
-      // Dừng kết nối cũ nếu tồn tại
-      if (isRegistered) {
-        print('Đang hủy đăng ký SIP cũ...');
-        await widget.helper!.unregister();
+        try {
+          // Dừng kết nối cũ nếu tồn tại
+          if (widget.helper.registerState.state == RegistrationStateEnum.REGISTERED) {
+            print('ZSolution - Đang hủy đăng ký SIP cũ...');
+            widget.helper.unregister();
+          }
+          
+          if (widget.helper.registerState.state != RegistrationStateEnum.NONE) {
+            print('ZSolution - Đang dừng kết nối SIP cũ...');
+            widget.helper.stop();
+          }
+
+          // Đợi một chút để đảm bảo kết nối cũ đã dừng
+          await Future.delayed(Duration(seconds: 1));
+
+          print('ZSolution - Khởi tạo kết nối SIP mới...');
+          await widget.helper.start(settings);
+          
+          // Đóng dialog loading
+          if (Navigator.canPop(context)) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+          
+          // Hiển thị thông báo thành công
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Đăng nhập thành công'),
+              backgroundColor: Colors.green,
+            ),
+          );
+
+        } catch (e) {
+          print('ZSolution - Lỗi cấu hình SIP: $e');
+          if (Navigator.canPop(context)) {
+            Navigator.of(context, rootNavigator: true).pop();
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Lỗi kết nối SIP: ${e.toString()}'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
       }
-      
-      if (isStarted) {
-        print('Đang dừng kết nối SIP cũ...');
-        widget.helper!.stop();
+    } catch (e) {
+      print('ZSolution - Lỗi đăng nhập: $e');
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
       }
-
-      print('Khởi tạo kết nối SIP mới...');
-      await widget.helper!.start(settings);
-      
-      // Thêm delay để đảm bảo quá trình đăng ký
-      await Future.delayed(Duration(seconds: 1));
-
-    } catch (e) {
-      print('Lỗi cấu hình SIP: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Lỗi kết nối SIP: ${e.toString()}')),
-      );
-    }
-  }
-
-    //   // Chuyển về màn hình chính
-    //   Navigator.pushReplacementNamed(context, '/home');
-    Navigator.pushReplacement(
-  context,
-  MaterialPageRoute(
-    builder: (context) => MainTabs(helper: widget.helper),
-  ),
-);
-    } catch (e) {
-      // Hiển thị lỗi rõ ràng
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Đăng nhập thất bại: ${e.toString()}')),
+        SnackBar(
+          content: Text('Đăng nhập thất bại: ${e.toString()}'),
+          backgroundColor: Colors.red,
+        ),
       );
     } finally {
       setState(() => _loading = false);
@@ -336,25 +422,20 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                 SizedBox(
                                   width: double.infinity,
                                   height: 52,
-                                  child: ElevatedButton(
-                                    onPressed: _loading ? null : _login,
-                                    style: ElevatedButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      elevation: 0,
-                                    ),
-                                    child: Ink(
-                                      decoration: const BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [Color(0xFF6A5AE0), Color(0xFFB16CEA)],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
-                                        ),
-                                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                                      ),
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: _loading ? null : _login,
+                                      borderRadius: BorderRadius.circular(16),
                                       child: Container(
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                            colors: [Color(0xFF6A5AE0), Color(0xFFB16CEA)],
+                                            begin: Alignment.centerLeft,
+                                            end: Alignment.centerRight,
+                                          ),
+                                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                                        ),
                                         alignment: Alignment.center,
                                         child: _loading
                                             ? CircularProgressIndicator(color: Colors.white)

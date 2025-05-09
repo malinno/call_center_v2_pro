@@ -21,15 +21,23 @@ void main() {
   if (WebRTC.platformIsDesktop) {
     debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
   }
+  
+  // Khởi tạo SIPUAHelper với cấu hình mặc định
   final SIPUAHelper _normalHelper = SIPUAHelper();
   final SIPUAHelper _zSolutionHelper = SIPUAHelper();
   
- runApp(
+  // Cấu hình logger chi tiết hơn
+  Logger.level = Level.debug;
+  
+  runApp(
     MultiProvider(
       providers: [
         Provider<SIPUAHelper>.value(value: _normalHelper),
         Provider<SIPUAHelper>.value(value: _zSolutionHelper),
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
+        Provider<SipUserCubit>(
+          create: (context) => SipUserCubit(sipHelper: _normalHelper),
+        ),
       ],
       child: MyApp(),
     ),
@@ -45,48 +53,42 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final normalHelper = Provider.of<SIPUAHelper>(context);
     final zSolutionHelper = Provider.of<SIPUAHelper>(context);
-    final SIPUAHelper helper = normalHelper;
+    final sipUserCubit = Provider.of<SipUserCubit>(context);
 
-    return MultiProvider(
-      providers: [
-        Provider<SipUserCubit>(
-            create: (context) => SipUserCubit(sipHelper: normalHelper)),
-      ],
-      child: MaterialApp(
-        title: 'SOLY',
-        theme: Provider.of<ThemeProvider>(context).currentTheme,
-        initialRoute: '/intro',
-        onGenerateRoute: (settings) {
-          final String? name = settings.name;
-          
-          final Map<String, PageContentBuilder> routes = {
-            '/home': ([SIPUAHelper? h, Object? arguments]) {
-              if (arguments is SIPUAHelper) {
-                return MainTabs(arguments);
-              }
-              return MainTabs(h);
-            },
-            '/intro': ([SIPUAHelper? h, Object? arguments]) => IntroScreen(),
-            '/': ([SIPUAHelper? h, Object? arguments]) => DialPadWidget(helper: h ?? normalHelper),
-           '/register': ([SIPUAHelper? h, Object? arguments]) => RegisterWidget(h ?? normalHelper),
-            '/zsolution': ([SIPUAHelper? h, Object? arguments]) => ZSolutionLoginWidget(helper: zSolutionHelper),
-            '/callscreen': ([SIPUAHelper? h, Object? arguments]) => CallScreenWidget(h, settings.arguments as Call?),
-            '/about': ([SIPUAHelper? h, Object? arguments]) => AboutWidget(),
-          };
-          final PageContentBuilder? pageContentBuilder = routes[name!];
-          if (pageContentBuilder != null) {
-            if (settings.arguments != null) {
-              return MaterialPageRoute<Widget>(
-                  builder: (context) =>
-                      pageContentBuilder(helper, settings.arguments));
-            } else {
-              return MaterialPageRoute<Widget>(
-                  builder: (context) => pageContentBuilder(helper));
+    return MaterialApp(
+      title: 'SOLY',
+      theme: Provider.of<ThemeProvider>(context).currentTheme,
+      initialRoute: '/intro',
+      onGenerateRoute: (settings) {
+        final String? name = settings.name;
+        
+        final Map<String, PageContentBuilder> routes = {
+          '/home': ([SIPUAHelper? h, Object? arguments]) {
+            if (arguments is SIPUAHelper) {
+              return MainTabs(arguments);
             }
+            return MainTabs(h ?? normalHelper);
+          },
+          '/intro': ([SIPUAHelper? h, Object? arguments]) => IntroScreen(),
+          '/': ([SIPUAHelper? h, Object? arguments]) => DialPadWidget(helper: h ?? normalHelper),
+          '/register': ([SIPUAHelper? h, Object? arguments]) => RegisterWidget(h ?? normalHelper),
+          '/zsolution': ([SIPUAHelper? h, Object? arguments]) => ZSolutionLoginWidget(helper: zSolutionHelper),
+          '/callscreen': ([SIPUAHelper? h, Object? arguments]) => CallScreenWidget(h, settings.arguments as Call?),
+          '/about': ([SIPUAHelper? h, Object? arguments]) => AboutWidget(),
+        };
+        final PageContentBuilder? pageContentBuilder = routes[name!];
+        if (pageContentBuilder != null) {
+          if (settings.arguments != null) {
+            return MaterialPageRoute<Widget>(
+                builder: (context) =>
+                    pageContentBuilder(settings.arguments as SIPUAHelper));
+          } else {
+            return MaterialPageRoute<Widget>(
+                builder: (context) => pageContentBuilder(normalHelper));
           }
-          return null;
-        },
-      ),
+        }
+        return null;
+      },
     );
   }
 }
