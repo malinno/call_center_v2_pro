@@ -15,6 +15,8 @@ import 'src/register.dart';
 import 'src/intro_screen.dart';
 import 'src/main_tabs.dart';
 import 'src/z_solution_login_widget.dart';
+import 'src/providers/call_provider.dart';
+import 'src/widgets/call_handler.dart';
 
 void main() {
   Logger.level = Level.warning;
@@ -35,11 +37,14 @@ void main() {
         Provider<SIPUAHelper>.value(value: _normalHelper),
         Provider<SIPUAHelper>.value(value: _zSolutionHelper),
         ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
+        ChangeNotifierProvider<CallProvider>(create: (_) => CallProvider()),
         Provider<SipUserCubit>(
           create: (context) => SipUserCubit(sipHelper: _normalHelper),
         ),
       ],
-      child: MyApp(),
+      child: CallHandler(
+        child: MyApp(),
+      ),
     ),
   );
 }
