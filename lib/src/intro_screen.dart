@@ -14,9 +14,10 @@ class _IntroScreenState extends State<IntroScreen> {
   void initState() {
     super.initState();
     _logger.d('IntroScreen initState');
-    Future.delayed(const Duration(seconds: 2), () {
-      _checkLoginAndNavigate();
-    });
+    // Tạm thời comment phần navigation để test
+    // Future.delayed(const Duration(seconds: 2), () {
+    //   _checkLoginAndNavigate();
+    // });
   }
 
   Future<void> _checkLoginAndNavigate() async {
@@ -35,29 +36,29 @@ class _IntroScreenState extends State<IntroScreen> {
   Widget build(BuildContext context) {
     _logger.d('Building IntroScreen');
     return Scaffold(
-      body: Container(
-        color: Colors.white,
+      backgroundColor: Colors.blue, // Thêm màu nền để dễ nhận biết
+      body: SafeArea(
         child: Center(
-          child: TweenAnimationBuilder<double>(
-            tween: Tween(begin: 0.7, end: 1.0),
-            duration: const Duration(milliseconds: 900),
-            curve: Curves.easeOutBack,
-            builder: (context, scale, child) {
-              _logger.d('Building animation with scale: $scale');
-              return Transform.scale(
-                scale: scale,
-                child: child,
-              );
-            },
-            child: Image.asset(
-              'lib/src/assets/Soly.png',
-              width: 100,
-              height: 100,
-              errorBuilder: (context, error, stackTrace) {
-                _logger.e('Error loading image: $error');
-                return const Icon(Icons.error);
-              },
-            ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text(
+                'Welcome to SOLY',
+                style: TextStyle(
+                  fontSize: 24,
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              SizedBox(height: 20),
+              ElevatedButton(
+                onPressed: () {
+                  _logger.d('Button pressed');
+                  Navigator.of(context).pushReplacementNamed('/register');
+                },
+                child: Text('Get Started'),
+              ),
+            ],
           ),
         ),
       ),

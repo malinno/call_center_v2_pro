@@ -61,7 +61,7 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
 
   @override
   void callStateChanged(Call call, CallState state) {
-    print('MainTabs - Call State Changed: ${state.state}');
+    // Không xử lý gì ở đây, để DialPadWidget xử lý
   }
 
   @override

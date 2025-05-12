@@ -48,45 +48,31 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
       _isRegistered = state.state == RegistrationStateEnum.REGISTERED;
       _isRegistering = false;
     });
-
-    if (state.state == RegistrationStateEnum.UNREGISTERED || 
-        state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
-      print('DialPad - Not registered, waiting for transport to reconnect...');
-      _isRegistering = true;
-      // Không thử đăng ký lại ngay lập tức, đợi transport kết nối lại
-    }
   }
 
   @override
   void transportStateChanged(TransportState state) {
     print('DialPad - Transport State Changed: ${state.state}');
-    if (state.state == TransportStateEnum.CONNECTED && !_isRegistered && !_isRegistering) {
-      print('DialPad - Transport connected, attempting to register...');
-      _isRegistering = true;
-      // Đợi một chút để đảm bảo kết nối ổn định
-      Future.delayed(Duration(milliseconds: 500), () {
-        if (mounted) {
-          try {
-            widget.helper.register();
-          } catch (e) {
-            print('DialPad - Registration failed: $e');
-            _isRegistering = false;
-          }
-        }
-      });
-    } else if (state.state == TransportStateEnum.DISCONNECTED) {
-      print('DialPad - Transport disconnected, attempting to reconnect...');
-      // Thử kết nối lại sau 1 giây
-      Future.delayed(Duration(seconds: 1), () {
-        if (mounted) {
-          try {
-            // Không thử đăng ký lại khi đã ngắt kết nối
-            print('DialPad - Connection lost, waiting for transport to reconnect...');
-          } catch (e) {
-            print('DialPad - Reconnection failed: $e');
-          }
-        }
-      });
+  }
+
+  @override
+  void callStateChanged(Call call, CallState state) async {
+    if (state.state == CallStateEnum.CALL_INITIATION) {
+      await saveCallHistory(call.remote_identity ?? '');
+      if (mounted) {
+        await Navigator.pushNamed(
+          context,
+          '/callscreen',
+          arguments: call,
+        );
+        setState(() => _numberController.clear());
+      }
+    }
+    if (state.state == CallStateEnum.FAILED) {
+      await saveCallHistory(call.remote_identity ?? '', missed: true);
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
     }
   }
 
@@ -99,18 +85,26 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
       return;
     }
 
-    if (!_isRegistered) {
-      print('DialPad - Not registered, attempting to register before call...');
-      _isRegistering = true;
+    // Xin quyền microphone
+    var status = await Permission.microphone.request();
+    if (status != PermissionStatus.granted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Cần cấp quyền truy cập microphone để thực hiện cuộc gọi')),
+      );
+      return;
+    }
+
+    // Kiểm tra trạng thái đăng ký SIP
+    if (widget.helper.registerState.state != RegistrationStateEnum.REGISTERED) {
       try {
+        // Đăng ký SIP
         widget.helper.register();
         // Đợi đăng ký thành công
         await Future.delayed(Duration(seconds: 2));
-        if (!_isRegistered) {
+        if (widget.helper.registerState.state != RegistrationStateEnum.REGISTERED) {
           throw Exception('Không thể đăng ký SIP');
         }
       } catch (e) {
-        print('DialPad - Registration failed: $e');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Không thể kết nối SIP. Vui lòng thử lại.')),
         );
@@ -127,27 +121,26 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
           'X-Feature-Code: basic',
         ],
       );
-      Navigator.pushNamed(context, '/callscreen', arguments: call);
+      if (mounted) {
+        await Navigator.pushNamed(
+          context, 
+          '/callscreen',
+          arguments: call,
+        );
+      }
     } catch (e) {
-      print('DialPad - Call failed: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Không thể thực hiện cuộc gọi. Vui lòng thử lại.')),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Không thể thực hiện cuộc gọi: ${e.toString()}')),
+        );
+      }
     }
   }
 
   void _append(String digit) {
-    if (!_isRegistered && !_isRegistering) {
-      print('DialPad - Not registered, attempting to register before append...');
-      _isRegistering = true;
-      // Đợi một chút trước khi thử đăng ký lại
-      Future.delayed(Duration(milliseconds: 500), () {
-        if (mounted) {
-          widget.helper.register();
-        }
-      });
-    }
-    _numberController.text += digit;
+    setState(() {
+      _numberController.text += digit;
+    });
   }
 
   void _backspace() {
@@ -262,17 +255,9 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
   }
 
   @override
-  void callStateChanged(Call call, CallState state) async {
-    if (state.state == CallStateEnum.CALL_INITIATION) {
-      await saveCallHistory(call.remote_identity ?? '');
-      await Navigator.pushNamed(context, '/callscreen', arguments: call);
-      setState(() => _numberController.clear());
-    }
-    if (state.state == CallStateEnum.FAILED) {
-      await saveCallHistory(call.remote_identity ?? '', missed: true);
-    }
-  }
-  @override void onNewMessage(SIPMessageRequest msg) {}
-  @override void onNewNotify(Notify ntf) {}
-  @override void onNewReinvite(ReInvite event) {}
+  void onNewMessage(SIPMessageRequest msg) {}
+  @override
+  void onNewNotify(Notify ntf) {}
+  @override
+  void onNewReinvite(ReInvite event) {}
 }

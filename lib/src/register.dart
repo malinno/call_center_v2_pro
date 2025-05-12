@@ -137,7 +137,6 @@ class _RegisterWidgetState extends State<RegisterWidget>
         }
       });
     } else if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
-      print('Đăng ký SIP thất bại: ${state.cause}');
       // Đóng dialog loading nếu đang mở
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -151,7 +150,6 @@ class _RegisterWidgetState extends State<RegisterWidget>
         fontSize: 16.0,
       );
     } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
-      print('Đăng ký SIP bị hủy');
       // Đóng dialog loading nếu đang mở
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
@@ -185,38 +183,25 @@ class _RegisterWidgetState extends State<RegisterWidget>
 
   @override
   void transportStateChanged(TransportState state) {
-    print('Transport State Changed: ${state.state}');
+   
     if (state.state == TransportStateEnum.CONNECTED) {
-      print('Transport connected, attempting to register...');
-      // Đợi một chút để đảm bảo kết nối ổn định
+    
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
           try {
             if (_sipSettings != null) {
               widget.helper.register();
-            } else {
-              print('No SIP settings available, cannot register');
-            }
-          } catch (e) {
-            print('Registration failed: $e');
-          }
+            }}
         }
       });
     } else if (state.state == TransportStateEnum.DISCONNECTED) {
-      print('Transport disconnected, attempting to reconnect...');
-      // Thử kết nối lại sau 1 giây
       Future.delayed(Duration(seconds: 1), () {
         if (mounted) {
           try {
             if (_sipSettings != null) {
-              print('Attempting to reconnect with saved settings...');
+              
               widget.helper.start(_sipSettings);
-            } else {
-              print('No SIP settings available, cannot reconnect');
-            }
-          } catch (e) {
-            print('Reconnection failed: $e');
-          }
+            } }
         }
       });
     }

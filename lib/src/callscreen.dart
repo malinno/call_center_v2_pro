@@ -58,8 +58,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   String? get remoteIdentity => call!.remote_identity;
 
   Direction? get direction {
-    if (call!.direction == 'incoming') return Direction.incoming;
-    if (call!.direction == 'outgoing') return Direction.outgoing;
+    if (call == null) return null;
+    if (call!.direction?.toLowerCase() == 'incoming') return Direction.incoming;
+    if (call!.direction?.toLowerCase() == 'outgoing') return Direction.outgoing;
     return null;
   }
 
@@ -68,9 +69,17 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   @override
   initState() {
     super.initState();
+    print('CallScreen - initState, call direction: ${call?.direction}');
     _initRenderers();
     helper!.addSipUaHelperListener(this);
     _startTimer();
+    _callConfirmed = false;
+    _state = CallStateEnum.NONE;
+    
+    // Khởi tạo audio session
+    if (!kIsWeb) {
+      _initAudioSession();
+    }
   }
 
   @override
@@ -113,8 +122,39 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     }
   }
 
+  Future<void> _initAudioSession() async {
+    try {
+      // Cấu hình audio session
+      if (_localStream != null) {
+        for (var track in _localStream!.getAudioTracks()) {
+          track.enableSpeakerphone(false);
+        }
+      }
+    } catch (e) {
+      print('Error initializing audio session: $e');
+    }
+  }
+
   @override
   void callStateChanged(Call call, CallState callState) {
+    // Nếu là cuộc gọi đến và chưa được xác nhận
+    if (call.direction?.toLowerCase() == 'incoming' && !_callConfirmed) {
+      switch (callState.state) {
+        case CallStateEnum.CALL_INITIATION:
+        case CallStateEnum.PROGRESS:
+          setState(() {});
+          break;
+        case CallStateEnum.ENDED:
+        case CallStateEnum.FAILED:
+          _backToDialPad();
+          break;
+        default:
+          break;
+      }
+      return;
+    }
+
+    // Xử lý các trạng thái khác cho cuộc gọi đã được xác nhận
     if (callState.state == CallStateEnum.HOLD ||
         callState.state == CallStateEnum.UNHOLD) {
       _hold = callState.state == CallStateEnum.HOLD;
@@ -143,31 +183,37 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
       return;
     }
 
+    // Cập nhật trạng thái cho cuộc gọi đã được xác nhận
     if (callState.state != CallStateEnum.STREAM) {
       _state = callState.state;
     }
 
     switch (callState.state) {
       case CallStateEnum.STREAM:
-        _handleStreams(callState);
+        if (_callConfirmed) {
+          _handleStreams(callState);
+        }
         break;
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
         _backToDialPad();
         break;
+      case CallStateEnum.ACCEPTED:
+      case CallStateEnum.CONFIRMED:
+        if (_callConfirmed) {
+          setState(() {});
+        }
+        break;
       case CallStateEnum.UNMUTED:
       case CallStateEnum.MUTED:
       case CallStateEnum.CONNECTING:
       case CallStateEnum.PROGRESS:
-      case CallStateEnum.ACCEPTED:
-      case CallStateEnum.CONFIRMED:
-        setState(() => _callConfirmed = true);
-        break;
       case CallStateEnum.HOLD:
       case CallStateEnum.UNHOLD:
       case CallStateEnum.NONE:
       case CallStateEnum.CALL_INITIATION:
       case CallStateEnum.REFER:
+        setState(() {});
         break;
     }
   }
@@ -193,9 +239,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
 
   void _backToDialPad() {
     _timer.cancel();
-    Timer(Duration(seconds: 2), () {
+    if (mounted) {
       Navigator.of(context).pop();
-    });
+    }
     _cleanUp();
   }
 
@@ -208,8 +254,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
         _localRenderer!.srcObject = stream;
       }
 
-      if (!kIsWeb &&
-          !WebRTC.platformIsDesktop) {
+      if (!kIsWeb) {
         final audioTracks = stream.getAudioTracks();
         if (audioTracks.isNotEmpty) {
           audioTracks.first.enableSpeakerphone(false);
@@ -247,6 +292,14 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   }
 
   void _handleAccept() async {
+    if (call?.direction?.toLowerCase() != 'incoming') {
+      return;
+    }
+
+    setState(() {
+      _callConfirmed = true;
+    });
+
     bool remoteHasVideo = call!.remote_has_video;
     final mediaConstraints = <String, dynamic>{
       'audio': true,
@@ -264,21 +317,34 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     };
     MediaStream mediaStream;
 
-    if (kIsWeb && remoteHasVideo) {
-      mediaStream =
-          await navigator.mediaDevices.getDisplayMedia(mediaConstraints);
-      MediaStream userStream =
-          await navigator.mediaDevices.getUserMedia(mediaConstraints);
-      mediaStream.addTrack(userStream.getAudioTracks()[0], addToNative: true);
-    } else {
-      if (!remoteHasVideo) {
-        mediaConstraints['video'] = false;
+    try {
+      if (kIsWeb && remoteHasVideo) {
+        mediaStream =
+            await navigator.mediaDevices.getDisplayMedia(mediaConstraints);
+        MediaStream userStream =
+            await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        mediaStream.addTrack(userStream.getAudioTracks()[0], addToNative: true);
+      } else {
+        if (!remoteHasVideo) {
+          mediaConstraints['video'] = false;
+        }
+        mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
       }
-      mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
-    }
 
-    call!.answer(helper!.buildCallOptions(!remoteHasVideo),
-        mediaStream: mediaStream);
+      // Cấu hình audio trước khi answer
+      if (!kIsWeb) {
+        for (var track in mediaStream.getAudioTracks()) {
+          track.enableSpeakerphone(false);
+        }
+      }
+
+      call!.answer(helper!.buildCallOptions(!remoteHasVideo),
+          mediaStream: mediaStream);
+    } catch (e) {
+      setState(() {
+        _callConfirmed = false;
+      });
+    }
   }
 
   void _switchCamera() {
@@ -384,7 +450,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     if (_localStream != null) {
       _speakerOn = !_speakerOn;
       if (!kIsWeb) {
-        _localStream!.getAudioTracks()[0].enableSpeakerphone(_speakerOn);
+        for (var track in _localStream!.getAudioTracks()) {
+          track.enableSpeakerphone(_speakerOn);
+        }
       }
     }
   }
@@ -430,6 +498,8 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   }
 
   Widget _buildActionButtons() {
+    print('CallScreen - Building action buttons, state: $_state, direction: ${call?.direction}, confirmed: $_callConfirmed');
+    
     final hangupBtn = ActionButton(
       title: "hangup",
       onPressed: () => _handleHangup(),
@@ -448,21 +518,31 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     final advanceActions = <Widget>[];
     final advanceActions2 = <Widget>[];
 
+    if (call?.direction?.toLowerCase() == 'incoming' && !_callConfirmed) {
+      print('CallScreen - Showing accept/reject buttons');
+      basicActions.add(ActionButton(
+        title: "Accept",
+        fillColor: Colors.green,
+        icon: Icons.phone,
+        onPressed: () => _handleAccept(),
+      ));
+      basicActions.add(hangupBtn);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(3),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: basicActions,
+            ),
+          ),
+        ],
+      );
+    }
+
     switch (_state) {
-      case CallStateEnum.NONE:
-      case CallStateEnum.CONNECTING:
-        if (direction == Direction.incoming) {
-          basicActions.add(ActionButton(
-            title: "Accept",
-            fillColor: Colors.green,
-            icon: Icons.phone,
-            onPressed: () => _handleAccept(),
-          ));
-          basicActions.add(hangupBtn);
-        } else {
-          basicActions.add(hangupBtn);
-        }
-        break;
       case CallStateEnum.ACCEPTED:
       case CallStateEnum.CONFIRMED:
         {
@@ -591,7 +671,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     Color? textColor = Theme.of(context).textTheme.bodyMedium?.color;
     final stackWidgets = <Widget>[];
 
-    if (!voiceOnly && _remoteStream != null) {
+    if (_callConfirmed && !voiceOnly && _remoteStream != null) {
       stackWidgets.add(
         Center(
           child: RTCVideoView(
@@ -602,7 +682,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
       );
     }
 
-    if (!voiceOnly && _localStream != null) {
+    if (_callConfirmed && !voiceOnly && _localStream != null) {
       stackWidgets.add(
         AnimatedContainer(
           child: RTCVideoView(
@@ -618,39 +698,38 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
         ),
       );
     }
-    if (voiceOnly || !_callConfirmed) {
-      stackWidgets.addAll(
-        [
-          Positioned(
-            top: MediaQuery.of(context).size.height / 8,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.center,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: <Widget>[
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Text(
-                        (voiceOnly ? 'VOICE CALL' : 'VIDEO CALL') +
-                            (_hold
-                                ? ' PAUSED BY ${_holdOriginator!.name}'
-                                : ''),
-                        style: TextStyle(fontSize: 24, color: textColor),
-                      ),
+
+    stackWidgets.addAll(
+      [
+        Positioned(
+          top: MediaQuery.of(context).size.height / 8,
+          left: 0,
+          right: 0,
+          child: Center(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Text(
+                      (voiceOnly ? 'VOICE CALL' : 'VIDEO CALL') +
+                          (_hold ? ' PAUSED BY ${_holdOriginator!.name}' : ''),
+                      style: TextStyle(fontSize: 24, color: textColor),
                     ),
                   ),
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(6),
-                      child: Text(
-                        '$remoteIdentity',
-                        style: TextStyle(fontSize: 18, color: textColor),
-                      ),
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(6),
+                    child: Text(
+                      '$remoteIdentity',
+                      style: TextStyle(fontSize: 18, color: textColor),
                     ),
                   ),
+                ),
+                if (_callConfirmed)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.all(6),
@@ -665,129 +744,167 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
                       ),
                     ),
                   )
-                ],
-              ),
+              ],
             ),
           ),
-        ],
-      );
-    }
+        ),
+      ],
+    );
 
     return Stack(
       children: stackWidgets,
     );
   }
 
-@override
-Widget build(BuildContext context) {
-  final textColor = Colors.white;
-  final bg = BoxDecoration(
-    gradient: LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [Colors.black87, Colors.black54],
-    ),
-  );
+  @override
+  Widget build(BuildContext context) {
+    final textColor = Colors.white;
+    final bg = BoxDecoration(
+      gradient: LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Colors.black87, Colors.black54],
+      ),
+    );
 
-  return Scaffold(
-    backgroundColor: Colors.transparent,
-    body: Container(
-      decoration: bg,
-      child: SafeArea(
-        child: Column(
-          children: [
-            // --- Header: số/tên và trạng thái ---
-            SizedBox(height: 40),
-            Text(
-              remoteIdentity ?? '',
-              style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
-            ),
-            ValueListenableBuilder<String>(
-              valueListenable: _timeLabel,
-              builder: (_, val, __) => Text(
-                val,
-                style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 16),
+    return Scaffold(
+      backgroundColor: Colors.transparent,
+      body: Container(
+        decoration: bg,
+        child: SafeArea(
+          child: Column(
+            children: [
+              // --- Header: số/tên và trạng thái ---
+              SizedBox(height: 40),
+              Text(
+                remoteIdentity ?? '',
+                style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
               ),
-            ),
-            Spacer(),
-
-            // --- Row nút chức năng: mute, keypad, speaker ---
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildCircleButton(
-                  icon: _audioMuted ? Icons.mic_off : Icons.mic,
-                  label: 'Mute',
-                  onTap: _muteAudio,
-                ),
-                _buildCircleButton(
-                  icon: Icons.dialpad,
-                  label: 'Keypad',
-                  onTap: _handleKeyPad,
-                ),
-                _buildCircleButton(
-                  icon: _speakerOn ? Icons.volume_up : Icons.hearing,
-                  label: 'Speaker',
-                  onTap: _toggleSpeaker,
-                ),
-              ],
-            ),
-
-            Spacer(),
-
-            // --- Hangup button ở giữa dưới cùng ---
-            Padding(
-              padding: const EdgeInsets.only(bottom: 32.0),
-              child: GestureDetector(
-                onTap: _handleHangup,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    shape: BoxShape.circle,
+              // Chỉ hiển thị thời gian khi đã accept cuộc gọi
+              if (_callConfirmed)
+                ValueListenableBuilder<String>(
+                  valueListenable: _timeLabel,
+                  builder: (_, val, __) => Text(
+                    val,
+                    style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 16),
                   ),
-                  child: Icon(Icons.call_end, color: Colors.white, size: 36),
+                ),
+              Spacer(),
+
+              // --- Row nút chức năng: mute, keypad, speaker ---
+              if (_callConfirmed) // Chỉ hiển thị khi đã accept
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildCircleButton(
+                      icon: _audioMuted ? Icons.mic_off : Icons.mic,
+                      label: 'Mute',
+                      onTap: _muteAudio,
+                    ),
+                    _buildCircleButton(
+                      icon: Icons.dialpad,
+                      label: 'Keypad',
+                      onTap: _handleKeyPad,
+                    ),
+                    _buildCircleButton(
+                      icon: _speakerOn ? Icons.volume_up : Icons.hearing,
+                      label: 'Speaker',
+                      onTap: _toggleSpeaker,
+                    ),
+                  ],
+                ),
+
+              Spacer(),
+
+              // --- Nút Accept/Reject hoặc Hangup ---
+              Padding(
+                padding: const EdgeInsets.only(bottom: 32.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    if (call?.direction?.toLowerCase() == 'incoming' && !_callConfirmed)
+                      ...[
+                        // Nút Accept
+                        GestureDetector(
+                          onTap: _handleAccept,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.phone, color: Colors.white, size: 36),
+                          ),
+                        ),
+                        SizedBox(width: 40),
+                        // Nút Reject
+                        GestureDetector(
+                          onTap: _handleHangup,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(Icons.call_end, color: Colors.white, size: 36),
+                          ),
+                        ),
+                      ]
+                    else
+                      // Nút Hangup khi đã accept hoặc là cuộc gọi đi
+                      GestureDetector(
+                        onTap: _handleHangup,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.red,
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.call_end, color: Colors.white, size: 36),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-            ),
-          ],
-        ),
-      ),
-    ),
-  );
-}
-
-/// Helper để tạo nút tròn với icon + label bên dưới
-Widget _buildCircleButton({
-  required IconData icon,
-  required String label,
-  required VoidCallback onTap,
-}) {
-  return Column(
-    children: [
-      InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(40),
-        child: Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            color: Colors.white12,
-            shape: BoxShape.circle,
+            ],
           ),
-          child: Icon(icon, color: Colors.white, size: 28),
         ),
       ),
-      SizedBox(height: 8),
-      Text(
-        label,
-        style: TextStyle(color: Colors.white70, fontSize: 14),
-      ),
-    ],
-  );
-}
+    );
+  }
 
+  /// Helper để tạo nút tròn với icon + label bên dưới
+  Widget _buildCircleButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(40),
+          child: Container(
+            width: 70,
+            height: 70,
+            decoration: BoxDecoration(
+              color: Colors.white12,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: Colors.white, size: 28),
+          ),
+        ),
+        SizedBox(height: 8),
+        Text(
+          label,
+          style: TextStyle(color: Colors.white70, fontSize: 14),
+        ),
+      ],
+    );
+  }
 
   @override
   void onNewReinvite(ReInvite event) {

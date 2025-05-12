@@ -54,22 +54,66 @@ class _AccountWidgetState extends State<AccountWidget> {
   }
 
   Future<void> _logout() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('is_logged_in', false);
-    await prefs.remove('zsolution_token');
-    await prefs.remove('zsolution_user');
     try {
-        if (widget.helper != null) {
+      // Hiển thị loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => Center(
+          child: CircularProgressIndicator(color: Colors.white),
+        ),
+      );
+
+      // Xóa dữ liệu đăng nhập nhưng giữ lại thông tin form
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('is_logged_in');
+      await prefs.remove('zsolution_token');
+      await prefs.remove('zsolution_user');
+      await prefs.remove('zsolution_email');
+      await prefs.remove('zsolution_password');
+      await prefs.remove('zsolution_remember_me');
+
+      // Hủy đăng ký SIP nếu đang đăng ký
+      if (widget.helper != null) {
+        try {
           if (widget.helper!.registerState.state == RegistrationStateEnum.REGISTERED) {
             widget.helper!.unregister();
           }
           widget.helper!.stop();
+        } catch (e) {
+          print('Error stopping SIP: $e');
         }
-      } catch (e) {
-        print('Error during logout: $e');
       }
 
-   Navigator.pushReplacementNamed(context, '/intro');
+      // Đóng dialog loading
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+
+      // Chuyển về màn hình intro
+      if (mounted) {
+        Navigator.pushNamedAndRemoveUntil(
+          context,
+          '/intro',
+          (route) => false, // Xóa tất cả các route trước đó
+        );
+      }
+    } catch (e) {
+      print('Error during logout: $e');
+      // Đóng dialog loading nếu có
+      if (Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      // Hiển thị thông báo lỗi
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Lỗi đăng xuất: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
