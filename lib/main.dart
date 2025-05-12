@@ -7,6 +7,10 @@ import 'package:logger/logger.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:provider/provider.dart';
 import 'package:sip_ua/sip_ua.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+import 'src/services/firebase_call_service.dart';
+import 'src/services/firebase_options.dart';
 
 import 'src/about.dart';
 import 'src/callscreen.dart';
@@ -18,7 +22,30 @@ import 'src/z_solution_login_widget.dart';
 import 'src/providers/call_provider.dart';
 import 'src/widgets/call_handler.dart';
 
-void main() {
+// Xử lý thông báo khi ứng dụng ở background
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  // Xử lý thông báo ở đây
+}
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Khởi tạo Firebase
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
+  
+  // Cấu hình Firebase Messaging
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+  
+  // Khởi tạo Firebase Call Service
+  final firebaseCallService = FirebaseCallService();
+  await firebaseCallService.initialize();
+  
   Logger.level = Level.warning;
   if (WebRTC.platformIsDesktop) {
     debugDefaultTargetPlatformOverride = TargetPlatform.fuchsia;
@@ -41,6 +68,7 @@ void main() {
         Provider<SipUserCubit>(
           create: (context) => SipUserCubit(sipHelper: _normalHelper),
         ),
+        Provider<FirebaseCallService>.value(value: firebaseCallService),
       ],
       child: CallHandler(
         child: MyApp(),
@@ -94,6 +122,22 @@ class MyApp extends StatelessWidget {
         }
         return null;
       },
+    );
+  }
+}
+
+class HomePage extends StatelessWidget {
+  const HomePage({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Firebase Call Demo'),
+      ),
+      body: const Center(
+        child: Text('Waiting for incoming calls...'),
+      ),
     );
   }
 }
