@@ -129,11 +129,7 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
         );
       }
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Không thể thực hiện cuộc gọi: ${e.toString()}')),
-        );
-      }
+      print('Error calling: $e');
     }
   }
 

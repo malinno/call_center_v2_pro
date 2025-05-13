@@ -191,7 +191,18 @@ class _RegisterWidgetState extends State<RegisterWidget>
           try {
             if (_sipSettings != null) {
               widget.helper.register();
-            }}
+            }
+          } catch (e) {
+            print('Error during SIP registration: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Lỗi đăng ký SIP: ${e.toString()}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
         }
       });
     } else if (state.state == TransportStateEnum.DISCONNECTED) {
@@ -199,9 +210,19 @@ class _RegisterWidgetState extends State<RegisterWidget>
         if (mounted) {
           try {
             if (_sipSettings != null) {
-              
               widget.helper.start(_sipSettings);
-            } }
+            }
+          } catch (e) {
+            print('Error during SIP start: $e');
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('Lỗi khởi động SIP: ${e.toString()}'),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          }
         }
       });
     }
