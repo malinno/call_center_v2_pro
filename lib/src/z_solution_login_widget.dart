@@ -7,6 +7,7 @@ import 'dart:convert';
 import 'dart:ui';
 import 'register.dart';
 import 'main_tabs.dart';
+import 'utils/notification_helper.dart';
 
 class ZSolutionLoginWidget extends StatefulWidget {
   final SIPUAHelper helper;
@@ -155,17 +156,8 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
       ),
     );
 
-    try {
-      print('ZSolution - Bắt đầu đăng nhập...');
-      print('Email: $email');
-      
+    try { 
       final user = await ZSolutionService.login(email, password);
-      print('ZSolution - Đăng nhập thành công!');
-      print('Thông tin user:');
-      print('Host: ${user.host}');
-      print('Extension: ${user.extension}');
-      print('Token: ${user.token}');
-
       // Lưu thông tin user
       final prefs = await SharedPreferences.getInstance();
       final userJson = user.toJson();
@@ -195,29 +187,22 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
         settings.transportType = TransportType.WS;
         settings.register = true;
         settings.register_expires = 300;
-
-        print('ZSolution - Cấu hình SIP với:');
-        print('webSocketUrl: ${settings.webSocketUrl}');
-        print('uri: ${settings.uri}');
-        print('authorizationUser: ${settings.authorizationUser}');
-        print('password: ${settings.password}');
-
         try {
           // Dừng kết nối cũ nếu tồn tại
           if (widget.helper.registerState.state == RegistrationStateEnum.REGISTERED) {
-            print('ZSolution - Đang hủy đăng ký SIP cũ...');
+            
             widget.helper.unregister();
           }
           
           if (widget.helper.registerState.state != RegistrationStateEnum.NONE) {
-            print('ZSolution - Đang dừng kết nối SIP cũ...');
+            
             widget.helper.stop();
           }
 
           // Đợi một chút để đảm bảo kết nối cũ đã dừng
           await Future.delayed(Duration(seconds: 1));
 
-          print('ZSolution - Khởi tạo kết nối SIP mới...');
+         
           await widget.helper.start(settings);
           
           // Đóng dialog loading
@@ -226,37 +211,22 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
           }
           
           // Hiển thị thông báo thành công
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Đăng nhập thành công'),
-              backgroundColor: Colors.green,
-            ),
-          );
+          NotificationHelper.showSuccess(context, 'Đăng nhập thành công');
 
         } catch (e) {
-          print('ZSolution - Lỗi cấu hình SIP: $e');
+         
           if (Navigator.canPop(context)) {
             Navigator.of(context, rootNavigator: true).pop();
           }
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text('Lỗi kết nối SIP: ${e.toString()}'),
-              backgroundColor: Colors.red,
-            ),
-          );
+          NotificationHelper.showError(context, 'Lỗi kết nối SIP: ${e.toString()}');
         }
       }
     } catch (e) {
-      print('ZSolution - Lỗi đăng nhập: $e');
+     
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đăng nhập thất bại: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      NotificationHelper.showError(context, 'Đăng nhập thất bại: ${e.toString()}');
     } finally {
       setState(() => _loading = false);
     }
@@ -273,48 +243,25 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
             height: 280,
             width: double.infinity,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF6A5AE0), Color(0xFF6A5AE0), Color(0xFFB16CEA)],
-                begin: Alignment.topCenter,
-                end: Alignment.center,
-              ),
+              color: Colors.white,
             ),
             child: SafeArea(
               child: Stack(
                 children: [
-                  Positioned(
-                    left: 0,
-                    top: 0,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
-                      onPressed: () {
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RegisterWidget(widget.helper),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
                   Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Text(
-                          'ZSolution',
-                          style: TextStyle(
+                        Container(
+                          padding: EdgeInsets.all(20),
+                          decoration: BoxDecoration(
                             color: Colors.white,
-                            fontSize: 36,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
-                            fontFamily: 'Poppins',
-                            shadows: [
-                              Shadow(
-                                color: Colors.black.withOpacity(0.5),
-                                offset: Offset(2, 2),
-                              ),
-                            ],
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          child: Image.asset(
+                            'lib/src/assets/images/soly.png',
+                            height: 100,
+                            fit: BoxFit.contain,
                           ),
                         ),
                       ],
@@ -429,11 +376,7 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                       borderRadius: BorderRadius.circular(16),
                                       child: Container(
                                         decoration: const BoxDecoration(
-                                          gradient: LinearGradient(
-                                            colors: [Color(0xFF6A5AE0), Color(0xFFB16CEA)],
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                          ),
+                                          color: Color(0xFFf8d605),
                                           borderRadius: BorderRadius.all(Radius.circular(16)),
                                         ),
                                         alignment: Alignment.center,
@@ -448,6 +391,41 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                                 ),
                                               ),
                                       ),
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: 18),
+                                Row(
+                                  children: const [
+                                    Expanded(child: Divider()),
+                                    Padding(
+                                      padding: EdgeInsets.symmetric(horizontal: 8.0),
+                                      child: Text('Hoặc đăng nhập với', style: TextStyle(color: Colors.black45)),
+                                    ),
+                                    Expanded(child: Divider()),
+                                  ],
+                                ),
+                                const SizedBox(height: 18),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: OutlinedButton(
+                                    onPressed: () {
+                                      Navigator.pushReplacement(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => RegisterWidget(widget.helper),
+                                        ),
+                                      );
+                                    },
+                                    child: const Text(
+                                      'Đăng nhập với Server',
+                                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                                    ),
+                                    style: OutlinedButton.styleFrom(
+                                      side: const BorderSide(color: Color(0xFFE0E0E0)),
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      backgroundColor: Colors.white,
+                                      padding: const EdgeInsets.symmetric(vertical: 14),
                                     ),
                                   ),
                                 ),

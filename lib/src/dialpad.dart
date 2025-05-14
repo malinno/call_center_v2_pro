@@ -148,104 +148,200 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
     }
   }
 
-  Widget _buildButton(Map<String, String> keyData) {
-    final num = keyData.keys.first;
-    final letters = keyData.values.first;
-    return GestureDetector(
-      onTap: () => _append(num),
-      child: Container(
-        width: 80,
-        height: 80,
-        decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
-          shape: BoxShape.circle,
-        ),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Text(num, style: TextStyle(color: Colors.white, fontSize: 32)),
-            if (letters.isNotEmpty)
-              Text(letters, style: TextStyle(color: Colors.white70, fontSize: 12)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _buildKeypad() {
-    return _keys.map((row) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6.0),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: row.map(_buildButton).toList(),
-        ),
-      );
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
+    final Color mainBlue = Color(0xFF223A5E);
+    final Color lightBlue = Color(0xFF1DA1F2);
+    final Color keyTextColor = Color(0xFF223A5E);
+    final Color keyBgColor = Colors.white;
+    final Color dialBg = Color(0xFFF7F9FB);
+    final Color borderColor = Color(0xFFE6EAF0);
+    final String selectedNumber = '0996484060'; // demo, bạn có thể lấy từ state
     return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          children: [
-            SizedBox(height: 10),
-            Text(
-              'SIP: ${widget.helper.registerState.state.toString()}',
-              style: TextStyle(color: Colors.white, fontSize: 14),
+      backgroundColor: dialBg,
+      body: Column(
+        children: [
+          // Header
+          Container(
+            color: mainBlue,
+            padding: const EdgeInsets.only(top: 0, left: 0, right: 0, bottom: 0),
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    IconButton(
+                      icon: Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    ),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Đầu số đang chọn', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.center,
+                            children: [
+                              Text(selectedNumber, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                              SizedBox(width: 8),
+                              Image.asset(
+                                'lib/src/assets/images/soly.png',
+                                height: 22,
+                                fit: BoxFit.contain,
+                                errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
+                              ),
+                              SizedBox(width: 6),
+                              Text(
+                                'zsolution',
+                                style: TextStyle(
+                                  color: Color(0xFF1DA1F2),
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  letterSpacing: 0.2,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.edit, color: Colors.white),
+                      onPressed: () {},
+                    ),
+                  ],
+                ),
+              ),
             ),
-            SizedBox(height: 40),
-            Text(
-              _numberController.text,
-              textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.white, fontSize: 36, letterSpacing: 2),
+          ),
+          // Phần giữa: minh họa + text
+          Expanded(
+            child: Container(
+              color: dialBg,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(height: 24),
+                  Icon(Icons.sync, size: 80, color: lightBlue.withOpacity(0.2)), // Thay bằng hình minh họa nếu có
+                  SizedBox(height: 16),
+                  Text('Chưa có dữ liệu', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                ],
+              ),
             ),
-            SizedBox(height: 20),
-            ..._buildKeypad(),
-            SizedBox(height: 20),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+          ),
+          // Bàn phím số
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.only(top: 8, left: 0, right: 0, bottom: 0),
+            child: Column(
               children: [
-                SizedBox(width: 70),
-                GestureDetector(
-                  onTap: _call,
-                  child: Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                    child: Icon(Icons.call, color: Colors.white, size: 36),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _numberController,
+                          keyboardType: TextInputType.phone,
+                          style: TextStyle(fontSize: 22, color: keyTextColor, fontWeight: FontWeight.w600),
+                          decoration: InputDecoration(
+                            hintText: 'Nhập số điện thoại',
+                            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 18),
+                            border: InputBorder.none,
+                          ),
+                          textAlign: TextAlign.left,
+                        ),
+                      ),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: lightBlue,
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: Icon(Icons.person_add, color: Colors.white),
+                          onPressed: () {},
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                SizedBox(width: 70,
-                  child: _numberController.text.isNotEmpty
-                    ? Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          borderRadius: BorderRadius.circular(22),
-                          onTap: _backspace,
-                          onLongPress: () => setState(() => _numberController.clear()),
-                          child: Container(
-                            width: 44,
-                            height: 44,
-                            alignment: Alignment.center,
-                            child: Icon(
-                              Icons.backspace_outlined,
-                              color: Colors.white70,
-                              size: 26,
+                SizedBox(height: 8),
+                // Keypad
+                for (int i = 0; i < _keys.length; i++)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 2),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                      children: [
+                        for (final keyData in _keys[i])
+                          GestureDetector(
+                            onTap: () => _append(keyData.keys.first),
+                            child: Container(
+                              width: 70,
+                              height: 70,
+                              margin: EdgeInsets.symmetric(horizontal: 2),
+                              decoration: BoxDecoration(
+                                color: keyBgColor,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: borderColor, width: 1.2),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(keyData.keys.first, style: TextStyle(color: keyTextColor, fontSize: 28, fontWeight: FontWeight.bold)),
+                                  if (keyData.values.first.isNotEmpty)
+                                    Text(keyData.values.first, style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                ],
+                              ),
                             ),
                           ),
+                      ],
+                    ),
+                  ),
+                SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    // Nút cài đặt
+                    IconButton(
+                      icon: Icon(Icons.settings, color: keyTextColor, size: 28),
+                      onPressed: () {},
+                    ),
+                    // Nút gọi
+                    GestureDetector(
+                      onTap: _call,
+                      child: Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: lightBlue,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: lightBlue.withOpacity(0.18),
+                              blurRadius: 12,
+                              offset: Offset(0, 4),
+                            ),
+                          ],
                         ),
-                      )
-                    : null,
+                        child: Icon(Icons.call, color: Colors.white, size: 32),
+                      ),
+                    ),
+                    // Nút xóa
+                    IconButton(
+                      icon: Icon(Icons.backspace_outlined, color: keyTextColor, size: 28),
+                      onPressed: _backspace,
+                      onLongPress: () => setState(() => _numberController.clear()),
+                    ),
+                  ],
                 ),
+                SizedBox(height: 12),
               ],
             ),
-            SizedBox(height: 40),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

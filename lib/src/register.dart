@@ -12,6 +12,8 @@ import 'dart:convert';
 import 'z_solution_login_widget.dart';
 import 'package:flutter/services.dart';
 import 'dart:ui';
+import 'utils/notification_helper.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class RegisterWidget extends StatefulWidget {
   final SIPUAHelper helper;
@@ -118,15 +120,7 @@ class _RegisterWidgetState extends State<RegisterWidget>
       }
       
       // Hiển thị thông báo thành công
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đăng ký thành công'),
-          backgroundColor: Colors.green,
-        ),
-      );
-      
-      // Chuyển sang màn hình chính
-      print('Đang chuyển sang màn hình chính...');
+      NotificationHelper.showSuccess(context, 'Đăng nhập thành công');
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
           Navigator.pushReplacementNamed(
@@ -141,27 +135,13 @@ class _RegisterWidgetState extends State<RegisterWidget>
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-      Fluttertoast.showToast(
-        msg: "Đăng ký thất bại: ${state.cause}",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.red,
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
+      NotificationHelper.showError(context, 'Đăng nhập thất bại: ${state.cause}');
     } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
       // Đóng dialog loading nếu đang mở
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-      Fluttertoast.showToast(
-        msg: "Đăng ký bị hủy",
-        toastLength: Toast.LENGTH_SHORT,
-        gravity: ToastGravity.BOTTOM,
-        backgroundColor: Colors.orange,
-        textColor: Colors.white,
-        fontSize: 16.0,
-      );
+      NotificationHelper.showWarning(context, 'Đăng nhập bị hủy');
     }
   }
 
@@ -195,12 +175,7 @@ class _RegisterWidgetState extends State<RegisterWidget>
           } catch (e) {
             print('Error during SIP registration: $e');
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Lỗi đăng ký SIP: ${e.toString()}'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              NotificationHelper.showError(context, 'Lỗi đăng ký SIP');
             }
           }
         }
@@ -213,14 +188,8 @@ class _RegisterWidgetState extends State<RegisterWidget>
               widget.helper.start(_sipSettings);
             }
           } catch (e) {
-            print('Error during SIP start: $e');
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Lỗi khởi động SIP: ${e.toString()}'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              NotificationHelper.showError(context, 'Lỗi khởi động SIP');
             }
           }
         }
@@ -239,13 +208,6 @@ class _RegisterWidgetState extends State<RegisterWidget>
     const port = '8089';
     final wsUrl = 'wss://$server:$port/ws';
     final sipUri = '$user@$server';
-
-    print('Bắt đầu đăng ký SIP...');
-    print('Server: $server');
-    print('Username: $user');
-    print('WebSocket URL: $wsUrl');
-    print('SIP URI: $sipUri');
-
     _saveSettings();
     showDialog(
       context: context,
@@ -253,7 +215,10 @@ class _RegisterWidgetState extends State<RegisterWidget>
       builder: (_) => AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(),
+            LoadingAnimationWidget.inkDrop(
+              color: Color(0xFF223A5E),
+              size: 38,
+            ),
             SizedBox(width: 20),
             Text('Đang đăng nhập...'),
           ],
@@ -264,19 +229,19 @@ class _RegisterWidgetState extends State<RegisterWidget>
     try {
       // Dừng kết nối cũ nếu tồn tại
       if (widget.helper.registerState.state == RegistrationStateEnum.REGISTERED) {
-        print('Đang hủy đăng ký SIP cũ...');
+       
         widget.helper.unregister();
       }
       
       // Kiểm tra trạng thái kết nối thông qua registerState
       if (widget.helper.registerState.state != RegistrationStateEnum.NONE) {
-        print('Đang dừng kết nối SIP cũ...');
+     
         widget.helper.stop();
       }
 
       // Đợi một chút để đảm bảo kết nối cũ đã dừng
       Future.delayed(Duration(seconds: 1)).then((_) {
-        print('Khởi tạo kết nối SIP mới...');
+      
         _sipSettings = UaSettings();
         _sipSettings.webSocketUrl = wsUrl;
         _sipSettings.uri = 'sip:$sipUri';
@@ -285,54 +250,28 @@ class _RegisterWidgetState extends State<RegisterWidget>
         _sipSettings.displayName = user;
         _sipSettings.userAgent = 'ZSolutionSoftphone';
         _sipSettings.transportType = _transport;
-        _sipSettings.register = true; // Đảm bảo tự động đăng ký
-        _sipSettings.register_expires = 300; // Thời gian hết hạn đăng ký (5 phút)
-
-        print('Cấu hình SIP với:');
-        print('webSocketUrl: ${_sipSettings.webSocketUrl}');
-        print('uri: ${_sipSettings.uri}');
-        print('authorizationUser: ${_sipSettings.authorizationUser}');
-        print('password: ${_sipSettings.password}');
-
+        _sipSettings.register = true; 
+        _sipSettings.register_expires = 300; 
         try {
           widget.helper.start(_sipSettings).then((_) {
-            print('SIP đã khởi động, đợi kết nối WebSocket...');
-            // Không gọi register() ở đây nữa, sẽ được gọi trong transportStateChanged
+           
           }).catchError((e) {
-            print('Lỗi khởi động SIP: $e');
             if (mounted) {
               Navigator.of(context).pop(); // Đóng dialog loading
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('Lỗi kết nối: ${e.toString()}'),
-                  backgroundColor: Colors.red,
-                ),
-              );
+              NotificationHelper.showError(context, 'Lỗi kết nối');
             }
           });
         } catch (e) {
-          print('Lỗi khởi động SIP: $e');
           if (mounted) {
             Navigator.of(context).pop(); // Đóng dialog loading
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('Lỗi kết nối: ${e.toString()}'),
-                backgroundColor: Colors.red,
-              ),
-            );
+            NotificationHelper.showError(context, 'Lỗi kết nối');
           }
         }
       });
     } catch (e) {
-      print('Lỗi đăng ký SIP: $e');
       if (mounted) {
         Navigator.of(context).pop(); // Đóng dialog loading
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Lỗi đăng ký: ${e.toString()}'),
-            backgroundColor: Colors.red,
-          ),
-        );
+        NotificationHelper.showError(context, 'Lỗi đăng đăng nhập');
       }
     }
   }
@@ -341,44 +280,29 @@ class _RegisterWidgetState extends State<RegisterWidget>
   Widget build(BuildContext context) {
     currentUser = context.watch<SipUserCubit>();
     return Scaffold(
-      backgroundColor: const Color(0xFFF6F7FB),
+      backgroundColor: Colors.white,
       body: Stack(
         children: [
           // Header gradient background
           Container(
-            height: 350,
+            height: 280,
             width: double.infinity,
             decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xFF6A5AE0), Color(0xFF6A5AE0), Color(0xFFB16CEA)],
-                begin: Alignment.topCenter,
-                end: Alignment.center,
-              ),
+              color: Colors.white,
             ),
             child: SafeArea(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Text(
-                      'ZSolution',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 36,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                        fontFamily: 'Poppins',
-                        shadows: [
-                          Shadow(
-                            color: Colors.black.withOpacity(0.5),
-                            offset: Offset(2, 2),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+              child: Center(
+                child: Container(
+                  // padding: EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Image.asset(
+                    'lib/src/assets/images/soly.png',
+                    height: 120,
+                    fit: BoxFit.contain,
+                  ),
                 ),
               ),
             ),
@@ -501,37 +425,29 @@ class _RegisterWidgetState extends State<RegisterWidget>
                                 SizedBox(
                                   width: double.infinity,
                                   height: 52,
-                                  child: ElevatedButton(
-                                    onPressed: () {
-                                      if (_formKey.currentState!.validate()) {
-                                        _register();
-                                      }
-                                    },
-                                    style: ElevatedButton.styleFrom(
-                                      padding: EdgeInsets.zero,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      elevation: 0,
-                                      backgroundColor: Colors.transparent,
-                                    ),
-                                    child: Container(
-                                      decoration: const BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: [Color(0xFF6A5AE0), Color(0xFFB16CEA)],
-                                          begin: Alignment.centerLeft,
-                                          end: Alignment.centerRight,
+                                  child: Material(
+                                    color: Colors.transparent,
+                                    child: InkWell(
+                                      onTap: () {
+                                        if (_formKey.currentState!.validate()) {
+                                          _register();
+                                        }
+                                      },
+                                      borderRadius: BorderRadius.circular(16),
+                                      child: Container(
+                                        decoration: const BoxDecoration(
+                                          color: Color(0xFFf8d605),
+                                          borderRadius: BorderRadius.all(Radius.circular(16)),
                                         ),
-                                        borderRadius: BorderRadius.all(Radius.circular(16)),
-                                      ),
-                                      alignment: Alignment.center,
-                                      child: const Text(
-                                        'Đăng Nhập',
-                                        style: TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                          inherit: false,
+                                        alignment: Alignment.center,
+                                        child: const Text(
+                                          'Đăng Nhập',
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                            color: Colors.white,
+                                            inherit: false,
+                                          ),
                                         ),
                                       ),
                                     ),

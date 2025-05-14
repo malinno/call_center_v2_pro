@@ -131,10 +131,6 @@ class _AccountWidgetState extends State<AccountWidget> {
               padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(Icons.arrow_back_ios_new, color: Color(0xFF222B45)),
-                    onPressed: () => Navigator.of(context).maybePop(),
-                  ),
                   Expanded(
                     child: Center(
                       child: Text(
@@ -147,7 +143,6 @@ class _AccountWidgetState extends State<AccountWidget> {
                       ),
                     ),
                   ),
-                  SizedBox(width: 48), // Để cân icon back
                 ],
               ),
             ),
@@ -239,15 +234,58 @@ class _AccountWidgetState extends State<AccountWidget> {
                   _buildMenuItem(Icons.person, 'Thông tin cá nhân', 'Thông tin cá nhân'),
                   _buildMenuItem(Icons.support_agent, 'Tổng đài', 'Kết nối tổng đài', iconColor: Color(0xFF4BC17B), statusColor: Color(0xFF4BC17B)),
                   _buildMenuItem(Icons.lock, 'Đổi mật khẩu', 'Cập nhật lại mật khẩu hiện tại', iconColor: Color(0xFFB0B8C1)),
-                  _buildMenuItem(Icons.flag, 'Ngôn ngữ', 'Tiếng Việt', iconColor: Colors.red),
                   _buildMenuItem(Icons.settings, 'Cấu hình', 'Cấu hình thông báo', iconColor: Color(0xFF6B7A8F)),
                   _buildMenuItem(Icons.phone_android, 'Quyền thiết bị', 'Vui lòng cung cấp đủ các quyền cần thiết', iconColor: Color(0xFF6B7A8F)),
                   _buildMenuItem(Icons.support, 'Yêu cầu hỗ trợ', 'Tạo phiếu yêu cầu hỗ trợ qua Biểu mẫu', iconColor: Color(0xFF6B7A8F)),
                   _buildMenuItem(Icons.privacy_tip, 'Chính sách bảo mật', '', iconColor: Color(0xFF6B7A8F)),
                   SizedBox(height: 16),
+                  // Nút đăng xuất
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Container(
+                      width: double.infinity,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.03),
+                            blurRadius: 6,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _logout,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(Icons.logout, color: Color(0xFFF15B5B), size: 20),
+                                SizedBox(width: 8),
+                                Text(
+                                  'Đăng xuất',
+                                  style: TextStyle(
+                                    color: Color(0xFFF15B5B),
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(height: 16),
                   Center(
                     child: Text(
-                      'Phiên bản 2.1.29',
+                      'Phiên bản 1.0.1',
                       style: TextStyle(color: Color(0xFFB0B8C1), fontWeight: FontWeight.w500),
                     ),
                   ),

@@ -53,9 +53,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
 
   SIPUAHelper? get helper => widget._helper;
 
-  bool get voiceOnly => call!.voiceOnly && !call!.remote_has_video;
+  bool get voiceOnly => call?.voiceOnly == true && call?.remote_has_video != true;
 
-  String? get remoteIdentity => call!.remote_identity;
+  String? get remoteIdentity => call?.remote_identity;
 
   Direction? get direction {
     if (call == null) return null;
@@ -225,24 +225,50 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   void registrationStateChanged(RegistrationState state) {}
 
   void _cleanUp() {
-    if (_localStream == null) return;
     try {
-      _localStream?.getTracks().forEach((track) {
-        track.stop();
-      });
-      _localStream!.dispose();
+      if (_localStream != null) {
+        for (var track in _localStream!.getTracks()) {
+          track.stop();
+        }
+        _localStream!.dispose();
+        _localStream = null;
+      }
+      
+      if (_remoteStream != null) {
+        for (var track in _remoteStream!.getTracks()) {
+          track.stop();
+        }
+        _remoteStream!.dispose();
+        _remoteStream = null;
+      }
     } catch (e) {
-      print('Error cleaning up stream: $e');
+      print('Error cleaning up streams: $e');
     }
-    _localStream = null;
+  }
+
+  void _handleHangup() {
+    if (call != null) {
+      call!.hangup({'status_code': 603});
+    }
+    _timer.cancel();
+    
+    // Cleanup resources first
+    _cleanUp();
+    _disposeRenderers();
+    
+    // Then navigate back to call history
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   void _backToDialPad() {
     _timer.cancel();
-    if (mounted) {
-      Navigator.of(context).pop();
-    }
     _cleanUp();
+    _disposeRenderers();
+    if (mounted) {
+      Navigator.of(context).popUntil((route) => route.isFirst);
+    }
   }
 
   void _handleStreams(CallState event) async {
@@ -284,11 +310,6 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     _localVideoHeight = _remoteStream != null
         ? MediaQuery.of(context).size.height / 4
         : MediaQuery.of(context).size.height;
-  }
-
-  void _handleHangup() {
-    call!.hangup({'status_code': 603});
-    _timer.cancel();
   }
 
   void _handleAccept() async {
@@ -724,12 +745,12 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
                   child: Padding(
                     padding: const EdgeInsets.all(6),
                     child: Text(
-                      '$remoteIdentity',
+                      remoteIdentity ?? 'Đang kết nối...',
                       style: TextStyle(fontSize: 18, color: textColor),
                     ),
                   ),
                 ),
-                if (_callConfirmed)
+                if (_callConfirmed && call != null)
                   Center(
                     child: Padding(
                       padding: const EdgeInsets.all(6),
@@ -777,11 +798,11 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
               // --- Header: số/tên và trạng thái ---
               SizedBox(height: 40),
               Text(
-                remoteIdentity ?? '',
+                remoteIdentity ?? 'Đang kết nối...',
                 style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
               ),
               // Chỉ hiển thị thời gian khi đã accept cuộc gọi
-              if (_callConfirmed)
+              if (_callConfirmed && call != null)
                 ValueListenableBuilder<String>(
                   valueListenable: _timeLabel,
                   builder: (_, val, __) => Text(
@@ -792,7 +813,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
               Spacer(),
 
               // --- Row nút chức năng: mute, keypad, speaker ---
-              if (_callConfirmed) // Chỉ hiển thị khi đã accept
+              if (_callConfirmed && call != null) // Chỉ hiển thị khi đã accept và có call
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
@@ -855,7 +876,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
                     else
                       // Nút Hangup khi đã accept hoặc là cuộc gọi đi
                       GestureDetector(
-                        onTap: _handleHangup,
+                        onTap: call != null ? _handleHangup : null,
                         child: Container(
                           width: 80,
                           height: 80,
@@ -954,5 +975,13 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   @override
   void onNewNotify(Notify ntf) {
     // NO OP
+  }
+
+  @override
+  void dispose() {
+    _timer.cancel();
+    _cleanUp();
+    _disposeRenderers();
+    super.dispose();
   }
 }

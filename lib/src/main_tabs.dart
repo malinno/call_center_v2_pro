@@ -24,6 +24,7 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
     super.initState();
     widget.helper.addSipUaHelperListener(this);
     _isRegistered = widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
+    
   }
 
   @override
@@ -63,11 +64,13 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
   void onNewReinvite(ReInvite event) {}
 
   final List<_TabItem> _tabs = const [
-    _TabItem(icon: Icons.history, label: 'Lịch sử'),
+    _TabItem(icon: Icons.smart_toy, label: 'Lịch sử'),
     _TabItem(icon: Icons.person, label: 'Danh bạ'),
     _TabItem(icon: Icons.sticky_note_2, label: 'Phiếu ghi'),
     _TabItem(icon: Icons.account_circle, label: 'Tài khoản'),
   ];
+
+  bool get _isKeyboardOpen => MediaQuery.of(context).viewInsets.bottom > 0;
 
   @override
   Widget build(BuildContext context) {
@@ -87,19 +90,21 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
         backgroundColor: Colors.white,
        
         floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-        floatingActionButton: FloatingActionButton(
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => DialPadWidget(helper: widget.helper),
-                ),
-              );
-            },
-        child: const Icon(Icons.call,color: Colors.white, size: 32),
-        shape: CircleBorder(),
-        backgroundColor: Color(0xFF1DA1F2),
-        elevation: 10,
-      ),
+        floatingActionButton: _isKeyboardOpen
+            ? null
+            : FloatingActionButton(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => DialPadWidget(helper: widget.helper),
+                    ),
+                  );
+                },
+                child: const Icon(Icons.call, color: Colors.white, size: 32),
+                shape: CircleBorder(),
+                backgroundColor: Color(0xFF1DA1F2),
+                elevation: 10,
+              ),
         bottomNavigationBar: BottomAppBar(
           
           elevation: 18,
@@ -128,14 +133,14 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
                       children: [
                         Icon(
                           _tabs[tabIdx].icon,
-                          color: selected ? Color(0xFF1DA1F2) : Colors.grey,
+                          color: selected ? Color(0xFF223A5E) : Color(0xFFB0B8C1),
                           size: 28,
                         ),
                         SizedBox(height: 4),
                         Text(
                           _tabs[tabIdx].label,
                           style: TextStyle(
-                            color: selected ? Color(0xFF1DA1F2) : Colors.grey,
+                            color: selected ? Color(0xFF223A5E) : Color(0xFFB0B8C1),
                             fontWeight: selected ? FontWeight.bold : FontWeight.normal,
                             fontSize: 13,
                           ),
