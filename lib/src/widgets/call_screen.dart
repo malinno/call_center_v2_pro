@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
 
 class CallScreen extends StatefulWidget {
   final String callerName;
@@ -31,10 +30,11 @@ class _CallScreenState extends State<CallScreen> {
       backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const SizedBox(height: 50),
             CircleAvatar(
-              radius: 60,
+              radius: 50,
               backgroundImage: widget.avatar != null
                   ? NetworkImage(widget.avatar!)
                   : null,
@@ -78,15 +78,15 @@ class _CallScreenState extends State<CallScreen> {
                 _buildCallButton(
                   icon: Icons.call_end,
                   label: 'End',
-                  backgroundColor: Colors.red,
+                  color: Colors.red,
                   onPressed: () {
                     widget.onCallEnded(true);
-                    Navigator.pop(context);
+                    Navigator.of(context).pop();
                   },
                 ),
                 _buildCallButton(
-                  icon: _isSpeakerOn ? Icons.volume_up : Icons.volume_down,
-                  label: _isSpeakerOn ? 'Speaker Off' : 'Speaker On',
+                  icon: _isSpeakerOn ? Icons.volume_up : Icons.volume_off,
+                  label: _isSpeakerOn ? 'Speaker' : 'Earpiece',
                   onPressed: () {
                     setState(() {
                       _isSpeakerOn = !_isSpeakerOn;
@@ -105,28 +105,21 @@ class _CallScreenState extends State<CallScreen> {
   Widget _buildCallButton({
     required IconData icon,
     required String label,
-    Color backgroundColor = Colors.white24,
     required VoidCallback onPressed,
+    Color color = Colors.white,
   }) {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        CircleAvatar(
-          radius: 30,
-          backgroundColor: backgroundColor,
-          child: IconButton(
-            icon: Icon(icon),
-            color: Colors.white,
-            onPressed: onPressed,
-          ),
+        FloatingActionButton(
+          onPressed: onPressed,
+          backgroundColor: color,
+          child: Icon(icon),
         ),
         const SizedBox(height: 8),
         Text(
           label,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 12,
-          ),
+          style: const TextStyle(color: Colors.white),
         ),
       ],
     );

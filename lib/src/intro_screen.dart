@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
+import 'package:provider/provider.dart';
+import 'providers/fcm_provider.dart';
 
 class IntroScreen extends StatefulWidget {
   @override
@@ -14,10 +16,21 @@ class _IntroScreenState extends State<IntroScreen> {
   void initState() {
     super.initState();
     _logger.d('IntroScreen initState');
-    // Tạm thời comment phần navigation để test
-    // Future.delayed(const Duration(seconds: 2), () {
-    //   _checkLoginAndNavigate();
-    // });
+    _initializeServices();
+  }
+
+  Future<void> _initializeServices() async {
+    try {
+      // Khởi tạo FCM service
+      final fcmProvider = Provider.of<FCMProvider>(context, listen: false);
+      await fcmProvider.initialize();
+      _logger.d('FCM service initialized');
+      
+      // Kiểm tra trạng thái đăng nhập và điều hướng
+      await _checkLoginAndNavigate();
+    } catch (e) {
+      _logger.e('Error initializing services: $e');
+    }
   }
 
   Future<void> _checkLoginAndNavigate() async {

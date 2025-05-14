@@ -159,95 +159,169 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black87,
+      backgroundColor: Colors.white,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Padding(
-              padding: const EdgeInsets.all(16.0),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Lịch sử cuộc gọi',
-                    style: TextStyle(
+                  Expanded(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(16),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.04),
+                            blurRadius: 8,
+                            offset: Offset(0, 2),
+                          ),
+                        ],
+                      ),
+                      child: Text(
+                        'Lịch sử cuộc gọi',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Container(
+                    height: 48,
+                    width: 48,
+                    decoration: BoxDecoration(
                       color: Colors.white,
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.search, color: Colors.black87),
+                      onPressed: () {},
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(Icons.refresh, color: Colors.white),
-                    onPressed: _loadCallHistory,
-                  ),
-                ],
-              ),
-            ),
-            // Custom iOS-style tabs
-            Container(
-              margin: EdgeInsets.symmetric(horizontal: 16),
-              padding: EdgeInsets.all(2),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.grey.shade300, width: 1),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedTab = 0;
-                        });
-                      },
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _selectedTab == 0 ? Colors.grey.shade200 : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
+                  const SizedBox(width: 8),
+                  Container(
+                    height: 48,
+                    width: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.04),
+                          blurRadius: 8,
+                          offset: Offset(0, 2),
                         ),
-                        child: Center(
-                          child: Text(
-                            'Tất cả',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
+                      ],
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        setState(() {
-                          _selectedTab = 1;
-                        });
-                      },
-                      child: Container(
-                        padding: EdgeInsets.symmetric(vertical: 8),
-                        decoration: BoxDecoration(
-                          color: _selectedTab == 1 ? Colors.grey.shade200 : Colors.white,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Gọi nhỡ',
-                            style: TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
+                    child: IconButton(
+                      icon: Icon(Icons.tune, color: Colors.black87),
+                      onPressed: () {},
                     ),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: 8),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  color: Color(0xFFF5F7FA),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = 0;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 0 ? Colors.white : Color(0xFFF5F7FA),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: _selectedTab == 0
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.04),
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Tất cả',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            _selectedTab = 1;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: Duration(milliseconds: 180),
+                          padding: const EdgeInsets.symmetric(vertical: 10),
+                          decoration: BoxDecoration(
+                            color: _selectedTab == 1 ? Colors.white : Color(0xFFF5F7FA),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: _selectedTab == 1
+                                ? [
+                                    BoxShadow(
+                                      color: Colors.black.withOpacity(0.04),
+                                      blurRadius: 6,
+                                      offset: Offset(0, 2),
+                                    ),
+                                  ]
+                                : [],
+                          ),
+                          child: Center(
+                            child: Text(
+                              'Gọi nhỡ',
+                              style: TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
             Expanded(
               child: _isLoading
                   ? Center(child: CircularProgressIndicator())
@@ -258,7 +332,7 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> {
                             children: [
                               Text(
                                 _error!,
-                                style: TextStyle(color: Colors.white70),
+                                style: TextStyle(color: Colors.black54),
                               ),
                               SizedBox(height: 16),
                               ElevatedButton(
@@ -274,74 +348,99 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> {
                                 _selectedTab == 0 
                                     ? 'Không có lịch sử cuộc gọi'
                                     : 'Không có cuộc gọi nhỡ',
-                                style: TextStyle(color: Colors.white70),
+                                style: TextStyle(color: Colors.black54),
                               ),
                             )
-                          : ListView.builder(
+                          : ListView.separated(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                               itemCount: _getFilteredHistory().length,
+                              separatorBuilder: (context, idx) => SizedBox(height: 10),
                               itemBuilder: (context, index) {
                                 final call = _getFilteredHistory()[index];
                                 String timeStr = '';
                                 try {
                                   final now = DateTime.now();
                                   final callDate = call.dateTime;
-                                  final isToday = now.year == callDate.year && now.month == callDate.month && now.day == callDate.day;
-                                  final yesterday = now.subtract(Duration(days: 1));
-                                  final isYesterday = yesterday.year == callDate.year && yesterday.month == callDate.month && yesterday.day == callDate.day;
                                   final hourMinute = '${callDate.hour.toString().padLeft(2, '0')}:${callDate.minute.toString().padLeft(2, '0')}';
-                                  if (isToday) {
-                                    timeStr = '$hourMinute Hôm nay';
-                                  } else if (isYesterday) {
-                                    timeStr = '$hourMinute Hôm qua';
-                                  } else {
-                                    timeStr = '$hourMinute ${callDate.day.toString().padLeft(2, '0')}/${callDate.month.toString().padLeft(2, '0')}/${callDate.year}';
-                                  }
+                                  timeStr = hourMinute;
                                 } catch (_) {}
-                                return ListTile(
-                                  leading: Icon(
-                                    call.missed ? Icons.call_missed : Icons.call_received,
-                                    color: call.missed ? Colors.red : Colors.green,
+                                return Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.white,
+                                    borderRadius: BorderRadius.circular(18),
+                                    boxShadow: [
+                                      BoxShadow(
+                                        color: Colors.black.withOpacity(0.03),
+                                        blurRadius: 6,
+                                        offset: Offset(0, 2),
+                                      ),
+                                    ],
                                   ),
-                                  title: Text(
-                                    call.phoneNumber,
-                                    style: TextStyle(
-                                      color: call.missed ? Colors.red : Colors.white,
-                                      fontWeight: call.missed ? FontWeight.bold : FontWeight.normal,
-                                    ),
-                                  ),
-                                  subtitle: Text(
-                                    _isZSolutionLogin
-                                        ? 'Số gọi đi: ${call.srcNumber ?? ''}'
-                                        : '${call.dateTime.toString()} - ${call.region}',
-                                    style: TextStyle(color: Colors.white70),
-                                  ),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
+                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                                  child: Row(
                                     children: [
-                                      Text(
-                                        timeStr,
-                                        style: TextStyle(
-                                          color: Colors.grey.shade400,
-                                          fontSize: 13,
-                                          fontWeight: FontWeight.w500,
+                                      CircleAvatar(
+                                        radius: 26,
+                                        backgroundColor: Color(0xFFE3F0FA),
+                                        child: Icon(Icons.person, color: Color(0xFF6B7A8F), size: 32),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              'Không xác định',
+                                              style: TextStyle(
+                                                color: Colors.black,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 16,
+                                              ),
+                                            ),
+                                            Text(
+                                              call.phoneNumber,
+                                              style: TextStyle(
+                                                color: Color(0xFF6B7A8F),
+                                                fontWeight: FontWeight.w500,
+                                                fontSize: 15,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Row(
+                                              children: [
+                                                Icon(
+                                                  call.missed ? Icons.call_missed : Icons.call_made,
+                                                  color: call.missed ? Color(0xFFF15B5B) : Color(0xFF4BC17B),
+                                                  size: 18,
+                                                ),
+                                                const SizedBox(width: 4),
+                                                Text(
+                                                  call.missed
+                                                      ? 'Cuộc gọi đi / Không trả lời'
+                                                      : 'Cuộc gọi đi / Trả lời',
+                                                  style: TextStyle(
+                                                    color: call.missed ? Color(0xFFF15B5B) : Color(0xFF4BC17B),
+                                                    fontWeight: FontWeight.w500,
+                                                    fontSize: 13,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      SizedBox(width: 8),
-                                      GestureDetector(
-                                        onTap: () {
-                                          // Gọi số điện thoại
-                                          _callNumber(context, call.phoneNumber);
-                                        },
-                                        child: Container(
-                                          width: 32,
-                                          height: 32,
-                                          decoration: BoxDecoration(
-                                            color: Colors.blue.shade50,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.blue.shade200),
+                                      Column(
+                                        crossAxisAlignment: CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            timeStr,
+                                            style: TextStyle(
+                                              color: Color(0xFFB0B8C1),
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 14,
+                                            ),
                                           ),
-                                          child: Icon(Icons.call, color: Colors.blue, size: 18),
-                                        ),
+                                        ],
                                       ),
                                     ],
                                   ),

@@ -1,50 +1,59 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../services/call_service.dart';
 
-class CallProvider extends ChangeNotifier {
+class CallProvider with ChangeNotifier {
   final CallService _callService = CallService();
-  bool _isInCall = false;
+  String? _currentCallId;
   String? _currentCallerName;
-  String? _currentCallerId;
+  String? _currentCallerNumber;
   String? _currentCallerAvatar;
 
-  bool get isInCall => _isInCall;
+  String? get currentCallId => _currentCallId;
   String? get currentCallerName => _currentCallerName;
-  String? get currentCallerId => _currentCallerId;
+  String? get currentCallerNumber => _currentCallerNumber;
   String? get currentCallerAvatar => _currentCallerAvatar;
 
   Future<void> showIncomingCall({
     required String callerName,
-    required String callerId,
-    String? avatar,
+    required String callerNumber,
+    String? callerAvatar,
   }) async {
-    _currentCallerName = callerName;
-    _currentCallerId = callerId;
-    _currentCallerAvatar = avatar;
-    _isInCall = true;
-    notifyListeners();
-
-    await _callService.showIncomingCall(
+    _currentCallId = await _callService.showIncomingCall(
       callerName: callerName,
-      callerId: callerId,
-      avatar: avatar,
+      callerNumber: callerNumber,
+      callerAvatar: callerAvatar,
     );
+    _currentCallerName = callerName;
+    _currentCallerNumber = callerNumber;
+    _currentCallerAvatar = callerAvatar;
+    notifyListeners();
+  }
+
+  Future<void> acceptCall(String callId) async {
+    if (_currentCallId == callId) {
+      // Xử lý logic khi chấp nhận cuộc gọi
+      notifyListeners();
+    }
+  }
+
+  Future<void> declineCall(String callId) async {
+    if (_currentCallId == callId) {
+      await _callService.endCall(callId);
+      _resetCallState();
+    }
   }
 
   Future<void> endCall() async {
-    await _callService.endCall();
-    _resetCallState();
-  }
-
-  Future<void> endAllCalls() async {
-    await _callService.endAllCalls();
-    _resetCallState();
+    if (_currentCallId != null) {
+      await _callService.endCall(_currentCallId!);
+      _resetCallState();
+    }
   }
 
   void _resetCallState() {
-    _isInCall = false;
+    _currentCallId = null;
     _currentCallerName = null;
-    _currentCallerId = null;
+    _currentCallerNumber = null;
     _currentCallerAvatar = null;
     notifyListeners();
   }

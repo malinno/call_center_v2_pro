@@ -1,66 +1,62 @@
-import 'package:flutter_callkit_incoming/flutter_callkit_incoming.dart';
-import 'package:flutter_callkit_incoming/entities/call_kit_params.dart';
-import 'package:flutter_callkit_incoming/entities/android_params.dart';
-import 'package:flutter_callkit_incoming/entities/ios_params.dart';
+import 'dart:convert';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 
 class CallService {
-  static final CallService _instance = CallService._internal();
-  factory CallService() => _instance;
-  CallService._internal();
+  final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final Uuid _uuid = Uuid();
 
-  final _uuid = Uuid();
-
-  Future<void> showIncomingCall({
+  Future<String> showIncomingCall({
     required String callerName,
-    required String callerId,
-    String? avatar,
-    String? handle,
+    required String callerNumber,
+    String? callerAvatar,
   }) async {
-    final params = CallKitParams(
-      id: _uuid.v4(),
-      nameCaller: callerName,
-      appName: 'Call Center',
-      avatar: avatar,
-      handle: handle ?? callerId,
-      type: 0,
-      duration: 30000,
-      textAccept: 'Accept',
-      textDecline: 'Decline',
-      extra: <String, dynamic>{'userId': callerId},
-      headers: <String, dynamic>{'apiKey': 'Abc@123!', 'platform': 'flutter'},
-      android: const AndroidParams(
-        isCustomNotification: true,
-        isShowLogo: true,
-        ringtonePath: 'system_ringtone_default',
-        backgroundColor: '#0955fa',
-      ),
-      ios: const IOSParams(
-        iconName: 'CallKitLogo',
-        handleType: '',
-        supportsVideo: true,
-        maximumCallGroups: 2,
-        maximumCallsPerCallGroup: 1,
-        audioSessionMode: 'default',
-        audioSessionActive: true,
-        audioSessionPreferredSampleRate: 44100.0,
-        audioSessionPreferredIOBufferDuration: 0.005,
-        supportsDTMF: true,
-        supportsHolding: true,
-        supportsGrouping: false,
-        supportsUngrouping: false,
-        ringtonePath: 'system_ringtone_default',
-      ),
+    final callId = _uuid.v4();
+
+    const androidDetails = AndroidNotificationDetails(
+      'incoming_calls',
+      'Incoming Calls',
+      channelDescription: 'Notifications for incoming calls',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+      enableVibration: true,
+      playSound: true,
+      sound: RawResourceAndroidNotificationSound('ringtone'),
+      category: AndroidNotificationCategory.call,
+      fullScreenIntent: true,
+      actions: [
+        AndroidNotificationAction('accept', 'Accept'),
+        AndroidNotificationAction('decline', 'Decline'),
+      ],
     );
 
-    await FlutterCallkitIncoming.showCallkitIncoming(params);
+    const notificationDetails = NotificationDetails(
+      android: androidDetails,
+    );
+
+    await _localNotifications.show(
+      callId.hashCode,
+      'Incoming Call',
+      '$callerName ($callerNumber)',
+      notificationDetails,
+      payload: jsonEncode({
+        'type': 'incoming_call',
+        'call_id': callId,
+        'caller_name': callerName,
+        'caller_number': callerNumber,
+        'caller_avatar': callerAvatar,
+      }),
+    );
+
+    return callId;
   }
 
-  Future<void> endCall() async {
-    await FlutterCallkitIncoming.endAllCalls();
+  Future<void> endCall(String callId) async {
+    await _localNotifications.cancel(callId.hashCode);
   }
 
   Future<void> endAllCalls() async {
-    await FlutterCallkitIncoming.endAllCalls();
+    await _localNotifications.cancelAll();
   }
 } 

@@ -1,5 +1,3 @@
-import 'package:dart_sip_ua_example/src/theme_provider.dart';
-import 'package:dart_sip_ua_example/src/user_state/sip_user_cubit.dart';
 import 'package:flutter/foundation.dart'
     show debugDefaultTargetPlatformOverride;
 import 'package:flutter/material.dart';
@@ -9,9 +7,11 @@ import 'package:provider/provider.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-// import 'src/services/firebase_call_service.dart';
 import 'src/services/firebase_options.dart';
-// import 'src/services/firebase_service.dart';
+import 'src/providers/fcm_provider.dart';
+import 'src/theme_provider.dart';
+import 'src/user_state/sip_user_cubit.dart';
+import 'src/services/fcm_service.dart';
 
 import 'src/about.dart';
 import 'src/callscreen.dart';
@@ -24,6 +24,7 @@ import 'src/providers/call_provider.dart';
 import 'src/widgets/call_handler.dart';
 
 final _logger = Logger();
+final FCMService _fcmService = FCMService();
 
 // Xử lý thông báo khi ứng dụng ở background
 @pragma('vm:entry-point')
@@ -33,8 +34,23 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
       options: DefaultFirebaseOptions.currentPlatform,
     );
     _logger.d('Firebase initialized in background handler');
+    _logger.d('Handling a background message: ${message.messageId}');
+    _logger.d('Message data: ${message.data}');
+    
+    // Xử lý thông báo cuộc gọi đến
+    if (message.data['type'] == 'incoming_call') {
+      final callId = message.data['call_id'] as String;
+      final callerName = message.data['caller_name'] as String;
+      final callerNumber = message.data['caller_number'] as String;
+
+      await _fcmService.showIncomingCallNotification(
+        callId: callId,
+        callerName: callerName,
+        callerNumber: callerNumber,
+      );
+    }
   } catch (e) {
-    _logger.e('Error initializing Firebase in background: $e');
+    _logger.e('Error handling background message: $e');
   }
 }
 
@@ -52,7 +68,33 @@ Future<void> initializeFirebase() async {
         badge: true,
         sound: true,
       );
+
+      // Đăng ký xử lý thông báo khi app ở background
       FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      
+      // Xử lý thông báo khi app ở foreground
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        _logger.d('Got a message whilst in the foreground!');
+        _logger.d('Message data: ${message.data}');
+        if (message.data['type'] == 'incoming_call') {
+          final callId = message.data['call_id'] as String;
+          final callerName = message.data['caller_name'] as String;
+          final callerNumber = message.data['caller_number'] as String;
+
+          _fcmService.showIncomingCallNotification(
+            callId: callId,
+            callerName: callerName,
+            callerNumber: callerNumber,
+          );
+        }
+      });
+
+      // Xử lý khi người dùng mở app từ thông báo
+      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+        _logger.d('Message opened app from background state!');
+        _logger.d('Message data: ${message.data}');
+      });
+
       _logger.d('Firebase Messaging configured');
       
       // Lấy FCM token
@@ -70,6 +112,9 @@ Future<void> initializeApp() async {
   try {
     // // Khởi tạo Firebase thông qua service
     // await FirebaseService.instance.initialize();
+
+    // Khởi tạo Firebase
+    await initializeFirebase();
 
     // Khởi tạo SIPUAHelper
     final SIPUAHelper _normalHelper = SIPUAHelper();
@@ -90,6 +135,7 @@ Future<void> initializeApp() async {
           Provider<SIPUAHelper>.value(value: _zSolutionHelper),
           ChangeNotifierProvider<ThemeProvider>(create: (_) => ThemeProvider()),
           ChangeNotifierProvider<CallProvider>(create: (_) => CallProvider()),
+          ChangeNotifierProvider<FCMProvider>(create: (_) => FCMProvider()),
           Provider<SipUserCubit>(
             create: (context) => SipUserCubit(sipHelper: _normalHelper),
           ),
@@ -101,6 +147,7 @@ Future<void> initializeApp() async {
       ),
     );
   } catch (e) {
+    _logger.e('Error initializing app: $e');
     // Hiển thị màn hình lỗi với nút thử lại
     return runApp(
       MaterialApp(
@@ -110,7 +157,7 @@ Future<void> initializeApp() async {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Text(
-                  'Không thể khởi động ứng dụng',
+                  'Không thể khởi động ứng dụng: ${e.toString()}',
                   style: TextStyle(fontSize: 18),
                 ),
                 SizedBox(height: 20),
@@ -137,8 +184,8 @@ void main() async {
 class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final normalHelper = Provider.of<SIPUAHelper>(context);
-    final zSolutionHelper = Provider.of<SIPUAHelper>(context);
+    final normalHelper = Provider.of<SIPUAHelper>(context, listen: false);
+    final zSolutionHelper = Provider.of<SIPUAHelper>(context, listen: false);
 
     return MaterialApp(
       title: 'SOLY',

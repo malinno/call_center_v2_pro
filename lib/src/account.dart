@@ -118,54 +118,173 @@ class _AccountWidgetState extends State<AccountWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final userName = _isZSolutionLogin && _zsolutionUser != null ? _zsolutionUser!.userName : _username ?? '';
+    final email = _isZSolutionLogin && _zsolutionUser != null ? _zsolutionUser!.email : '';
+    final isOnline = true; // Tùy trạng thái thực tế, demo luôn online
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Color(0xFFF7F9FB),
       body: SafeArea(
-        child: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.account_circle, color: Colors.white, size: 80),
-              SizedBox(height: 24),
-              Text(
-                'Tài khoản',
-                style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
+        child: Column(
+          children: [
+            // Header
+            Padding(
+              padding: const EdgeInsets.fromLTRB(0, 0, 0, 8),
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: Icon(Icons.arrow_back_ios_new, color: Color(0xFF222B45)),
+                    onPressed: () => Navigator.of(context).maybePop(),
+                  ),
+                  Expanded(
+                    child: Center(
+                      child: Text(
+                        'Tài khoản',
+                        style: TextStyle(
+                          color: Color(0xFF222B45),
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  SizedBox(width: 48), // Để cân icon back
+                ],
               ),
-              SizedBox(height: 24),
-              if (_isZSolutionLogin && _zsolutionUser != null) ...[
-                Text('Username: ${_zsolutionUser!.userName}', 
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Role: ${_zsolutionUser!.roleName}', 
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Host: ${_zsolutionUser!.host ?? ""}',
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Extension: ${_zsolutionUser!.extension ?? ""}',
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Password: ${_zsolutionUser!.pass ?? ""}',
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-              ] else ...[
-                Text('Username: $_username', 
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-                SizedBox(height: 8),
-                Text('Server: $_server', 
-                    style: TextStyle(color: Colors.white70, fontSize: 18)),
-              ],
-              SizedBox(height: 32),
-              ElevatedButton(
-                onPressed: _logout,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
-                  padding: EdgeInsets.symmetric(horizontal: 32, vertical: 12),
+            ),
+            // Card thông tin tài khoản
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(18),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 8,
+                      offset: Offset(0, 2),
+                    ),
+                  ],
                 ),
-                child: Text('Đăng xuất', style: TextStyle(fontSize: 18, color: Colors.white)),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 28,
+                          backgroundColor: Color(0xFFE3F0FA),
+                          child: Icon(Icons.person, color: Color(0xFF6B7A8F), size: 36),
+                        ),
+                        SizedBox(width: 14),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                userName ?? '',
+                                style: TextStyle(
+                                  color: Color(0xFF222B45),
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              if ((email ?? '').isNotEmpty)
+                                Text(
+                                  email ?? '',
+                                  style: TextStyle(
+                                    color: Color(0xFF6B7A8F),
+                                    fontSize: 15,
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 12),
+                    Row(
+                      children: [
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Color(0xFF4BC17B),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('Trực tuyến', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+                        ),
+                        SizedBox(width: 8),
+                        Container(
+                          padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: Color(0xFFF2F3F7),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text('Ngắt kết nối tổng đài', style: TextStyle(color: Color(0xFF6B7A8F), fontWeight: FontWeight.w600)),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
+            SizedBox(height: 8),
+            // Danh sách chức năng
+            Expanded(
+              child: ListView(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+                children: [
+                  _buildMenuItem(Icons.person, 'Thông tin cá nhân', 'Thông tin cá nhân'),
+                  _buildMenuItem(Icons.support_agent, 'Tổng đài', 'Kết nối tổng đài', iconColor: Color(0xFF4BC17B), statusColor: Color(0xFF4BC17B)),
+                  _buildMenuItem(Icons.lock, 'Đổi mật khẩu', 'Cập nhật lại mật khẩu hiện tại', iconColor: Color(0xFFB0B8C1)),
+                  _buildMenuItem(Icons.flag, 'Ngôn ngữ', 'Tiếng Việt', iconColor: Colors.red),
+                  _buildMenuItem(Icons.settings, 'Cấu hình', 'Cấu hình thông báo', iconColor: Color(0xFF6B7A8F)),
+                  _buildMenuItem(Icons.phone_android, 'Quyền thiết bị', 'Vui lòng cung cấp đủ các quyền cần thiết', iconColor: Color(0xFF6B7A8F)),
+                  _buildMenuItem(Icons.support, 'Yêu cầu hỗ trợ', 'Tạo phiếu yêu cầu hỗ trợ qua Biểu mẫu', iconColor: Color(0xFF6B7A8F)),
+                  _buildMenuItem(Icons.privacy_tip, 'Chính sách bảo mật', '', iconColor: Color(0xFF6B7A8F)),
+                  SizedBox(height: 16),
+                  Center(
+                    child: Text(
+                      'Phiên bản 2.1.29',
+                      style: TextStyle(color: Color(0xFFB0B8C1), fontWeight: FontWeight.w500),
+                    ),
+                  ),
+                  SizedBox(height: 8),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMenuItem(IconData icon, String title, String subtitle, {Color iconColor = const Color(0xFF6B7A8F), Color? statusColor}) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.03),
+              blurRadius: 6,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        child: ListTile(
+          leading: CircleAvatar(
+            backgroundColor: Color(0xFFF2F3F7),
+            child: Icon(icon, color: iconColor),
           ),
+          title: Text(title, style: TextStyle(color: Color(0xFF222B45), fontWeight: FontWeight.w600)),
+          subtitle: subtitle.isNotEmpty ? Text(subtitle, style: TextStyle(color: Color(0xFFB0B8C1), fontSize: 13)) : null,
+          trailing: Icon(Icons.arrow_forward_ios, color: Color(0xFFB0B8C1), size: 18),
+          onTap: () {},
         ),
       ),
     );

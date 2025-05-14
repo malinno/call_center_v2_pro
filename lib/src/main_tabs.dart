@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'dialpad.dart';
-import 'register.dart';
 import 'call_history.dart';
-import 'account.dart'; 
+import 'contact.dart';
+import 'note.dart';
+import 'multi_channel.dart';
+import 'account.dart';
 
 class MainTabs extends StatefulWidget {
   final SIPUAHelper helper;
@@ -14,7 +16,7 @@ class MainTabs extends StatefulWidget {
 }
 
 class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
-  int _currentIndex = 0; 
+  int _currentIndex = 0;
   bool _isRegistered = false;
 
   @override
@@ -22,47 +24,34 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
     super.initState();
     widget.helper.addSipUaHelperListener(this);
     _isRegistered = widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
-    print('MainTabs initState - Current registration state: ${widget.helper.registerState.state}');
   }
 
   @override
   void dispose() {
-    print('MainTabs dispose - Current registration state: ${widget.helper.registerState.state}');
     widget.helper.removeSipUaHelperListener(this);
     super.dispose();
   }
 
   @override
   void registrationStateChanged(RegistrationState state) {
-    print('MainTabs - Registration State Changed: ${state.state}');
     setState(() {
       _isRegistered = state.state == RegistrationStateEnum.REGISTERED;
     });
-    
-    if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
-      print('MainTabs - Registration failed, attempting to re-register...');
-      // Thử đăng ký lại
-      widget.helper.register();
-    } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
-      print('MainTabs - Unregistered, attempting to re-register...');
-      // Thử đăng ký lại
+    if (state.state == RegistrationStateEnum.REGISTRATION_FAILED ||
+        state.state == RegistrationStateEnum.UNREGISTERED) {
       widget.helper.register();
     }
   }
 
   @override
   void transportStateChanged(TransportState state) {
-    print('MainTabs - Transport State Changed: ${state.state}');
     if (state.state == TransportStateEnum.CONNECTED) {
-      print('MainTabs - Transport connected, attempting to register...');
       widget.helper.register();
     }
   }
 
   @override
-  void callStateChanged(Call call, CallState state) {
-    // Không xử lý gì ở đây, để DialPadWidget xử lý
-  }
+  void callStateChanged(Call call, CallState state) {}
 
   @override
   void onNewMessage(SIPMessageRequest msg) {}
@@ -73,50 +62,124 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
   @override
   void onNewReinvite(ReInvite event) {}
 
+  final List<_TabItem> _tabs = const [
+    _TabItem(icon: Icons.history, label: 'Lịch sử'),
+    _TabItem(icon: Icons.person, label: 'Danh bạ'),
+    _TabItem(icon: Icons.sticky_note_2, label: 'Phiếu ghi'),
+    _TabItem(icon: Icons.account_circle, label: 'Tài khoản'),
+  ];
+
   @override
   Widget build(BuildContext context) {
     final screens = [
-      DialPadWidget(helper: widget.helper),     
-      CallHistoryWidget(),              
-      AccountWidget(),
+      CallHistoryWidget(helper: widget.helper),
+      ContactWidget(),
+      NoteWidget(),
+      AccountWidget(helper: widget.helper),
     ];
 
     return WillPopScope(
-      onWillPop: () async {
-        // Ngăn không cho back về màn hình đăng nhập
-        return false;
-      },
+      
+      onWillPop: () async => false,
       child: Scaffold(
+        extendBody:true,
         body: screens[_currentIndex],
-        bottomNavigationBar: BottomNavigationBar(
-          backgroundColor: Colors.black,
-          selectedItemColor: Colors.green,
-          unselectedItemColor: Colors.white70,
-          currentIndex: _currentIndex,
-          onTap: (index) {
-            setState(() => _currentIndex = index);
-            // Kiểm tra và đăng ký lại nếu cần
-            if (!_isRegistered) {
-              print('MainTabs - Tab changed, attempting to re-register...');
-              widget.helper.register();
-            }
-          },
-          items: const [
-            BottomNavigationBarItem(
-              icon: Icon(Icons.dialpad),
-              label: 'Bàn phím',
+        backgroundColor: Colors.white,
+       
+        floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
+        floatingActionButton: FloatingActionButton(
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => DialPadWidget(helper: widget.helper),
+                ),
+              );
+            },
+        child: const Icon(Icons.call,color: Colors.white, size: 32),
+        shape: CircleBorder(),
+        backgroundColor: Color(0xFF1DA1F2),
+        elevation: 10,
+      ),
+        bottomNavigationBar: BottomAppBar(
+          
+          elevation: 18,
+          color: Colors.white,
+           shape:const CircularNotchedRectangle(),
+           notchMargin: 5,
+          child: SizedBox(
+            height: 76,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: List.generate(_tabs.length + 1, (index) {
+                if (index == 2) {
+                  // Chỗ trống cho FAB
+                  return SizedBox(width: 40);
+                }
+                int tabIdx = index > 2 ? index - 1 : index;
+                final selected = _currentIndex == tabIdx;
+                return Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      setState(() => _currentIndex = tabIdx);
+                      if (!_isRegistered) widget.helper.register();
+                    },
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          _tabs[tabIdx].icon,
+                          color: selected ? Color(0xFF1DA1F2) : Colors.grey,
+                          size: 28,
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          _tabs[tabIdx].label,
+                          style: TextStyle(
+                            color: selected ? Color(0xFF1DA1F2) : Colors.grey,
+                            fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }),
             ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.history),
-              label: 'Lịch sử cuộc gọi',
-            ),
-            BottomNavigationBarItem(
-              icon: Icon(Icons.account_circle),
-              label: 'Tài khoản',
-            ),
-          ],
+          ),
         ),
       ),
     );
+  }
+}
+
+class _TabItem {
+  final IconData icon;
+  final String label;
+  const _TabItem({required this.icon, required this.label});
+}
+
+class BigCircularNotchedRectangle extends NotchedShape {
+  @override
+  Path getOuterPath(Rect host, Rect? guest) {
+    if (guest == null || !guest.overlaps(host)) {
+      return Path()..addRect(host);
+    }
+    final notchRadius = guest.width / 2.0 + 8;
+    final notchCenter = guest.center.dx;
+    final notchBottom = guest.top + guest.height / 2.2;
+    final path = Path();
+    path.moveTo(host.left, host.top);
+    path.lineTo(notchCenter - notchRadius, host.top);
+    path.arcToPoint(
+      Offset(notchCenter + notchRadius, host.top),
+      radius: Radius.circular(notchRadius),
+      clockwise: false,
+    );
+    path.lineTo(host.right, host.top);
+    path.lineTo(host.right, host.bottom);
+    path.lineTo(host.left, host.bottom);
+    path.close();
+    return path;
   }
 }
