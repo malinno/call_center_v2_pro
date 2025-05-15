@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_contacts/flutter_contacts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
+import 'package:shimmer/shimmer.dart';
 
 class ContactWidget extends StatefulWidget {
   @override
@@ -35,7 +37,7 @@ class _ContactWidgetState extends State<ContactWidget> {
   void _onSearchChanged() {
     setState(() {
       _search = _searchController.text.trim().toLowerCase();
-      if (_tabIndex == 2) { // Tab Thiết bị
+      if (_tabIndex == 2) {
         _filteredContacts = _contacts.where((c) {
           final name = c.displayName.toLowerCase();
           final phone = c.phones.isNotEmpty ? c.phones.first.number : '';
@@ -47,7 +49,7 @@ class _ContactWidgetState extends State<ContactWidget> {
 
   Future<void> _loadInitialData() async {
     setState(() => _loading = true);
-    if (_tabIndex == 2) { // Tab Thiết bị
+    if (_tabIndex == 2) { 
       await _fetchContacts();
     } else {
       // Giả lập dữ liệu cho tab OMI và Nhân viên
@@ -125,7 +127,53 @@ class _ContactWidgetState extends State<ContactWidget> {
   Widget _buildContactList() {
     if (_tabIndex == 2) { // Tab Thiết bị
       if (_loading) {
-        return Center(child: CircularProgressIndicator());
+        return Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: ListView.builder(
+            padding: EdgeInsets.only(top: 4),
+            itemCount: 10,
+            itemBuilder: (context, index) {
+              return Container(
+                margin: EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: ListTile(
+                  leading: CircleAvatar(
+                    backgroundColor: Colors.white,
+                  ),
+                  title: Container(
+                    width: double.infinity,
+                    height: 16,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  subtitle: Container(
+                    width: 140,
+                    height: 14,
+                    margin: EdgeInsets.only(top: 8),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  trailing: Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        );
       }
       if (!_hasPermission) {
         return Center(

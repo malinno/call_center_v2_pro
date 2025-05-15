@@ -1,0 +1,2 @@
+C:/Users/Windows/Desktop/call_center_v2_pro/android/app/.cxx/Debug/3c2t3g3d/x86/CMakeFiles/edit_cache.dir
+C:/Users/Windows/Desktop/call_center_v2_pro/android/app/.cxx/Debug/3c2t3g3d/x86/CMakeFiles/rebuild_cache.dir

@@ -64,7 +64,7 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
   void onNewReinvite(ReInvite event) {}
 
   final List<_TabItem> _tabs = const [
-    _TabItem(icon: Icons.smart_toy, label: 'Lịch sử'),
+    _TabItem(icon: Icons.history, label: 'Lịch sử'),
     _TabItem(icon: Icons.person, label: 'Danh bạ'),
     _TabItem(icon: Icons.sticky_note_2, label: 'Phiếu ghi'),
     _TabItem(icon: Icons.account_circle, label: 'Tài khoản'),
@@ -82,8 +82,12 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
     ];
 
     return WillPopScope(
-      
-      onWillPop: () async => false,
+      onWillPop: () async {
+        if (Navigator.of(context).canPop()) {
+          return true;
+        }
+        return false;
+      },
       child: Scaffold(
         extendBody:true,
         body: screens[_currentIndex],
@@ -133,7 +137,7 @@ class _MainTabsState extends State<MainTabs> implements SipUaHelperListener {
                       children: [
                         Icon(
                           _tabs[tabIdx].icon,
-                          color: selected ? Color(0xFF223A5E) : Color(0xFFB0B8C1),
+                          color: selected ? Color(0xFF223A5E) : Color(0xFF223A5E),
                           size: 28,
                         ),
                         SizedBox(height: 4),

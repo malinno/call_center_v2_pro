@@ -103,7 +103,6 @@ class _RegisterWidgetState extends State<RegisterWidget>
     setState(() => _registerState = state);
     
     if (state.state == RegistrationStateEnum.REGISTERED) {
-      print('Đăng ký SIP thành công!');
       if (_rememberMe) {
         _saveSettings();
       } else {

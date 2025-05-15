@@ -8,6 +8,7 @@ import 'dart:ui';
 import 'register.dart';
 import 'main_tabs.dart';
 import 'utils/notification_helper.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class ZSolutionLoginWidget extends StatefulWidget {
   final SIPUAHelper helper;
@@ -31,6 +32,7 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
     super.initState();
     _loadSavedAccount();
     widget.helper.addSipUaHelperListener(this);
+    ZSolutionService.setContext(context);
   }
 
   @override
@@ -41,50 +43,49 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
 
   @override
   void registrationStateChanged(RegistrationState state) {
-    print('ZSolution - Registration State Changed: ${state.state}');
     if (!mounted) return;
 
     if (state.state == RegistrationStateEnum.REGISTERED) {
-      print('ZSolution - Đăng ký SIP thành công!');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Đăng ký SIP thành công!'),
-          backgroundColor: Colors.green,
-        ),
-      );
+      // Đóng dialog loading nếu đang mở
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+
+      // Hiển thị thông báo thành công
+      NotificationHelper.showSuccess(context, 'Đăng nhập thành công');
       
-      // Chuyển sang màn hình chính
-      print('ZSolution - Đang chuyển sang màn hình chính...');
+      // Chuyển sang màn hình chính với helper tương ứng
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
-          Navigator.pushReplacement(
+          Navigator.pushReplacementNamed(
             context,
-            MaterialPageRoute(
-              builder: (context) => MainTabs(widget.helper),
-            ),
+            '/home',
+            arguments: widget.helper,
           );
         }
       });
     } else if (state.state == RegistrationStateEnum.REGISTRATION_FAILED) {
-      print('ZSolution - Đăng ký SIP thất bại: ${state.cause}');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Lỗi đăng ký SIP: ${state.cause}'),
-          backgroundColor: Colors.red,
-        ),
-      );
+      // Đóng dialog loading nếu đang mở
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      
+      NotificationHelper.showError(context, 'Lỗi đăng ký SIP: ${state.cause}');
     } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
-      print('ZSolution - Đăng ký SIP bị hủy');
-      // Không hiển thị thông báo khi unregister để tránh gây nhầm lẫn
+      // Đóng dialog loading nếu đang mở
+      if (Navigator.canPop(context)) {
+        Navigator.of(context, rootNavigator: true).pop();
+      }
+      
+      NotificationHelper.showWarning(context, 'Đăng ký SIP bị hủy');
     }
   }
 
   @override
   void transportStateChanged(TransportState state) {
-    print('ZSolution - Transport State Changed: ${state.state}');
+   
     if (state.state == TransportStateEnum.CONNECTED) {
-      print('ZSolution - Transport connected, attempting to register...');
-      // Đợi một chút để đảm bảo kết nối ổn định
+     
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
           try {
@@ -92,19 +93,18 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
               widget.helper.register();
             }
           } catch (e) {
-            print('ZSolution - Registration failed: $e');
+          
           }
         }
       });
     } else if (state.state == TransportStateEnum.DISCONNECTED) {
-      print('ZSolution - Transport disconnected, attempting to reconnect...');
-      // Thử kết nối lại sau 1 giây
+    
       Future.delayed(Duration(seconds: 1), () {
         if (mounted) {
           try {
             print('ZSolution - Connection lost, waiting for transport to reconnect...');
           } catch (e) {
-            print('ZSolution - Reconnection failed: $e');
+           
           }
         }
       });
@@ -113,7 +113,7 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
 
   @override
   void callStateChanged(Call call, CallState state) {
-    print('SIP Call State Changed: ${state.state}');
+   
   }
 
   @override
@@ -148,7 +148,10 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
       builder: (_) => AlertDialog(
         content: Row(
           children: [
-            CircularProgressIndicator(),
+            LoadingAnimationWidget.inkDrop(
+              color: Color(0xFF223A5E),
+              size: 38,
+            ),
             SizedBox(width: 20),
             Text('Đang đăng nhập...'),
           ],
@@ -187,34 +190,27 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
         settings.transportType = TransportType.WS;
         settings.register = true;
         settings.register_expires = 300;
+
         try {
           // Dừng kết nối cũ nếu tồn tại
           if (widget.helper.registerState.state == RegistrationStateEnum.REGISTERED) {
-            
             widget.helper.unregister();
           }
           
           if (widget.helper.registerState.state != RegistrationStateEnum.NONE) {
-            
             widget.helper.stop();
           }
 
           // Đợi một chút để đảm bảo kết nối cũ đã dừng
           await Future.delayed(Duration(seconds: 1));
-
-         
+          
+          // Khởi động kết nối mới
           await widget.helper.start(settings);
           
-          // Đóng dialog loading
-          if (Navigator.canPop(context)) {
-            Navigator.of(context, rootNavigator: true).pop();
-          }
-          
-          // Hiển thị thông báo thành công
-          NotificationHelper.showSuccess(context, 'Đăng nhập thành công');
+          // Không đóng dialog loading ở đây, đợi cho đến khi SIP đăng ký thành công
+          // Dialog sẽ được đóng trong registrationStateChanged khi REGISTERED
 
         } catch (e) {
-         
           if (Navigator.canPop(context)) {
             Navigator.of(context, rootNavigator: true).pop();
           }
@@ -222,7 +218,6 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
         }
       }
     } catch (e) {
-     
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }

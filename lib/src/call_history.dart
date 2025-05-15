@@ -8,6 +8,7 @@ import 'callscreen.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
 import 'widgets/add_customer_page.dart';
+import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class CallHistoryEntry {
   final String phoneNumber;
@@ -127,10 +128,13 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
       final zsolutionUserJson = prefs.getString('zsolution_user');
       _isZSolutionLogin = zsolutionUserJson != null && zsolutionUserJson.isNotEmpty;
 
+      print('Loading call history, isZSolutionLogin: $_isZSolutionLogin');
+
       if (_isZSolutionLogin) {
         try {
           // Load call history from ZSolution API
           final history = await ZSolutionService.getCallHistory();
+          print('Call history response: $history');
           setState(() {
             _callHistory = history.map((item) => CallHistoryEntry(
               phoneNumber: item['dst'] ?? '',
@@ -142,7 +146,6 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
             _isLoading = false;
           });
         } catch (e) {
-          print('Error loading ZSolution call history: $e');
           setState(() {
             _error = 'Không thể tải lịch sử cuộc gọi từ ZSolution';
             _isLoading = false;
@@ -215,9 +218,16 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
     return sorted;
   }
 
+  List<CallHistoryEntry> filterLastMonth(List<CallHistoryEntry> entries) {
+    final now = DateTime.now();
+    final oneMonthAgo = DateTime(now.year, now.month - 1, now.day);
+    return entries.where((entry) => entry.dateTime.isAfter(oneMonthAgo)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
-    final groupedHistory = groupByDate(_callHistory);
+    final lastMonthHistory = filterLastMonth(_callHistory);
+    final groupedHistory = groupByDate(lastMonthHistory);
     return Scaffold(
       backgroundColor: Color(0xFFF5F7FA),
       body: SafeArea(
@@ -251,9 +261,12 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
                                       hintText: 'Tìm kiếm',
                                     ),
                                     style: TextStyle(fontSize: 16),
+                                    textInputAction: TextInputAction.search,
+                                    onSubmitted: (value) {
+                                      _onSearch(value);
+                                    },
                                     onChanged: (value) {
-                                      // TODO: Lọc danh sách theo value
-                                      setState(() {}); // Để rebuild hiển thị icon
+                                      setState(() {});
                                     },
                                   ),
                                 ),
@@ -263,8 +276,8 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
                                     onPressed: () {
                                       setState(() {
                                         _searchController.clear();
-                                        // TODO: Reset danh sách về mặc định
                                       });
+                                      _loadCallHistory();
                                     },
                                   ),
                               ],
@@ -350,7 +363,12 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
             const SizedBox(height: 16),
             Expanded(
               child: _isLoading
-                  ? Center(child: CircularProgressIndicator())
+                  ? Center(
+                      child: LoadingAnimationWidget.inkDrop(
+                        color: Color(0xFF223A5E),
+                        size: 38,
+                      ),
+                    )
                   : _error != null
                       ? Center(
                           child: Column(
@@ -504,8 +522,8 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
                                   }
                                 }
                                 return SizedBox.shrink();
-                              },
-                            ),
+              },
+            ),
             ),
           ],
         ),
@@ -515,16 +533,22 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
 
   // Thêm hàm gọi số
   void _callNumber(BuildContext context, String phoneNumber) async {
+    print('CallHistory - _callNumber called');
     // Nếu có helper thì thực hiện gọi SIP
     if (widget.helper != null) {
       final success = await widget.helper!.call(phoneNumber, voiceOnly: true);
       if (mounted && success) {
+        print('CallHistory - Navigating to CallScreen with source: history');
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => CallScreenWidget(widget.helper, _currentCall),
+            builder: (context) => CallScreenWidget(widget.helper, _currentCall, source: 'history'),
           ),
-        );
+        ).then((_) {
+          // Khi quay về từ CallScreen, reload lại lịch sử cuộc gọi
+          print('CallHistory - Returned from CallScreen, reloading history');
+          _loadCallHistory();
+        });
       }
     } else {
       // Nếu không có helper, chỉ log ra
@@ -546,6 +570,34 @@ class _CallHistoryWidgetState extends State<CallHistoryWidget> implements SipUaH
 
   @override
   void onNewReinvite(ReInvite event) {}
+
+  void _onSearch(String value) async {
+    print('[UI] Bắt đầu tìm kiếm với số: $value');
+    if (value.trim().isEmpty) return;
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    try {
+      final history = await ZSolutionService.searchCallHistoryByPhone(value.trim());
+      print('[UI] Đã nhận kết quả từ API, số bản ghi: ${history.length}');
+      setState(() {
+        _callHistory = history.map((item) => CallHistoryEntry(
+          phoneNumber: item['dst'] ?? '',
+          dateTime: item['callDate'] != null ? DateTime.tryParse(item['callDate']!) ?? DateTime.now() : DateTime.now(),
+          region: getRegionName(item['dst'] ?? ''),
+          missed: false,
+          srcNumber: item['src'],
+        )).toList();
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = 'Không thể tìm kiếm lịch sử cuộc gọi';
+        _isLoading = false;
+      });
+    }
+  }
 }
 
 class CallDetailSheet extends StatelessWidget {

@@ -20,8 +20,9 @@ enum Direction {
 class CallScreenWidget extends StatefulWidget {
   final SIPUAHelper? _helper;
   final Call? _call;
+  final String? source;
 
-  CallScreenWidget(this._helper, this._call, {Key? key}) : super(key: key);
+  CallScreenWidget(this._helper, this._call, {this.source, Key? key}) : super(key: key);
 
   @override
   State<CallScreenWidget> createState() => _MyCallScreenWidget();
@@ -50,6 +51,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
 
   late String _transferTarget;
   late Timer _timer;
+  DateTime? _callStartTime;
 
   SIPUAHelper? get helper => widget._helper;
 
@@ -72,9 +74,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     print('CallScreen - initState, call direction: ${call?.direction}');
     _initRenderers();
     helper!.addSipUaHelperListener(this);
-    _startTimer();
     _callConfirmed = false;
     _state = CallStateEnum.NONE;
+    _timer = Timer(Duration(days: 365), () {}); // Dummy timer để tránh LateInitializationError
     
     // Khởi tạo audio session
     if (!kIsWeb) {
@@ -136,17 +138,21 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   }
 
   @override
-  void callStateChanged(Call call, CallState callState) {
+  void callStateChanged(Call call, CallState state) {
     // Nếu là cuộc gọi đến và chưa được xác nhận
     if (call.direction?.toLowerCase() == 'incoming' && !_callConfirmed) {
-      switch (callState.state) {
+      switch (state.state) {
         case CallStateEnum.CALL_INITIATION:
         case CallStateEnum.PROGRESS:
           setState(() {});
           break;
         case CallStateEnum.ENDED:
         case CallStateEnum.FAILED:
-          _backToDialPad();
+          if (widget.source == 'history') {
+            Navigator.of(context).pop();
+          } else {
+            Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+          }
           break;
         default:
           break;
@@ -155,52 +161,61 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     }
 
     // Xử lý các trạng thái khác cho cuộc gọi đã được xác nhận
-    if (callState.state == CallStateEnum.HOLD ||
-        callState.state == CallStateEnum.UNHOLD) {
-      _hold = callState.state == CallStateEnum.HOLD;
-      if (callState.originator == 'local') {
+    if (state.state == CallStateEnum.HOLD ||
+        state.state == CallStateEnum.UNHOLD) {
+      _hold = state.state == CallStateEnum.HOLD;
+      if (state.originator == 'local') {
         _holdOriginator = Originator.local;
-      } else if (callState.originator == 'remote') {
+      } else if (state.originator == 'remote') {
         _holdOriginator = Originator.remote;
-      } else if (callState.originator == 'system') {
+      } else if (state.originator == 'system') {
         _holdOriginator = Originator.system;
       }
       setState(() {});
       return;
     }
 
-    if (callState.state == CallStateEnum.MUTED) {
-      if (callState.audio!) _audioMuted = true;
-      if (callState.video!) _videoMuted = true;
+    if (state.state == CallStateEnum.MUTED) {
+      if (state.audio!) _audioMuted = true;
+      if (state.video!) _videoMuted = true;
       setState(() {});
       return;
     }
 
-    if (callState.state == CallStateEnum.UNMUTED) {
-      if (callState.audio!) _audioMuted = false;
-      if (callState.video!) _videoMuted = false;
+    if (state.state == CallStateEnum.UNMUTED) {
+      if (state.audio!) _audioMuted = false;
+      if (state.video!) _videoMuted = false;
       setState(() {});
       return;
     }
 
     // Cập nhật trạng thái cho cuộc gọi đã được xác nhận
-    if (callState.state != CallStateEnum.STREAM) {
-      _state = callState.state;
+    if (state.state != CallStateEnum.STREAM) {
+      _state = state.state;
     }
 
-    switch (callState.state) {
+    switch (state.state) {
       case CallStateEnum.STREAM:
         if (_callConfirmed) {
-          _handleStreams(callState);
+          _handleStreams(state);
         }
         break;
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
-        _backToDialPad();
+        if (widget.source == 'history') {
+          Navigator.of(context).pop();
+        } else {
+          Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+        }
         break;
       case CallStateEnum.ACCEPTED:
       case CallStateEnum.CONFIRMED:
-        if (_callConfirmed) {
+        if (!_callConfirmed) {
+          setState(() {
+            _callConfirmed = true;
+          });
+          _startTimer();
+        } else {
           setState(() {});
         }
         break;
@@ -247,27 +262,45 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   }
 
   void _handleHangup() {
-    if (call != null) {
-      call!.hangup({'status_code': 603});
+    print('CallScreen - _handleHangup called, source: ${widget.source}');
+    try {
+      if (call != null && call!.state != CallStateEnum.ENDED && call!.state != CallStateEnum.FAILED) {
+        call!.hangup({'status_code': 603});
+      }
+    } catch (e) {
+      print('Error when hanging up: $e');
     }
-    _timer.cancel();
-    
+    if (_timer.isActive) _timer.cancel();
+
     // Cleanup resources first
     _cleanUp();
     _disposeRenderers();
-    
-    // Then navigate back to call history
+
+    // Quay về màn hình phù hợp dựa vào nguồn gọi
     if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      print('CallScreen - Navigating back, source: ${widget.source}');
+      if (widget.source == 'history') {
+        // Nếu gọi từ màn lịch sử thì quay về màn lịch sử
+        Navigator.of(context).pop();
+      } else {
+        // Nếu gọi từ màn dialpad thì quay về màn dialpad
+        Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+      }
     }
   }
 
   void _backToDialPad() {
-    _timer.cancel();
+    if (_timer.isActive) _timer.cancel();
     _cleanUp();
     _disposeRenderers();
     if (mounted) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
+      if (widget.source == 'history') {
+        // Nếu gọi từ màn lịch sử thì quay về màn lịch sử
+        Navigator.of(context).pop();
+      } else {
+        // Nếu gọi từ màn dialpad thì quay về màn dialpad
+        Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+      }
     }
   }
 
@@ -779,151 +812,90 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
 
   @override
   Widget build(BuildContext context) {
-    final textColor = Colors.white;
-    final bg = BoxDecoration(
-      gradient: LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Colors.black87, Colors.black54],
-      ),
-    );
+    final Color bgColor = const Color(0xFF22304A); // Màu nền xanh đậm
+    final String myNumber = '0996484060'; // Số của bạn (có thể lấy động nếu cần)
+    final String callTime = _callStartTime != null
+        ? "${_callStartTime!.hour.toString().padLeft(2, '0')}:${_callStartTime!.minute.toString().padLeft(2, '0')}"
+        : '';
+    final String remoteNumber = call?.remote_identity ?? '0963998081';
+    final String remoteName = 'Không xác định'; // Có thể lấy tên nếu có
+    final bool isConnecting = !_callConfirmed;
 
     return Scaffold(
-      backgroundColor: Colors.transparent,
-      body: Container(
-        decoration: bg,
-        child: SafeArea(
-          child: Column(
-            children: [
-              // --- Header: số/tên và trạng thái ---
-              SizedBox(height: 40),
-              Text(
-                remoteIdentity ?? 'Đang kết nối...',
-                style: TextStyle(color: textColor, fontSize: 20, fontWeight: FontWeight.bold),
+      backgroundColor: bgColor,
+      body: SafeArea(
+        child: Stack(
+          children: [
+            // Header
+            Positioned(
+              top: 16,
+              left: 16,
+              child: Row(
+                children: [
+                  Icon(Icons.phone, color: Colors.white70, size: 18),
+                  SizedBox(width: 6),
+                  Text(myNumber, style: TextStyle(color: Colors.white70, fontSize: 15)),
+                ],
               ),
-              // Chỉ hiển thị thời gian khi đã accept cuộc gọi
-              if (_callConfirmed && call != null)
-                ValueListenableBuilder<String>(
-                  valueListenable: _timeLabel,
-                  builder: (_, val, __) => Text(
-                    val,
-                    style: TextStyle(color: textColor.withOpacity(0.8), fontSize: 16),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: Text('Cuộc gọi đi $callTime', style: TextStyle(color: Colors.white70, fontSize: 15)),
+            ),
+            // Avatar + tên + số
+            Align(
+              alignment: Alignment(0, -0.5),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  CircleAvatar(
+                    radius: 48,
+                    backgroundColor: Colors.white24,
+                    child: Icon(Icons.person, color: Colors.white, size: 60),
                   ),
-                ),
-              Spacer(),
-
-              // --- Row nút chức năng: mute, keypad, speaker ---
-              if (_callConfirmed && call != null) // Chỉ hiển thị khi đã accept và có call
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildCircleButton(
-                      icon: _audioMuted ? Icons.mic_off : Icons.mic,
-                      label: 'Mute',
-                      onTap: _muteAudio,
-                    ),
-                    _buildCircleButton(
-                      icon: Icons.dialpad,
-                      label: 'Keypad',
-                      onTap: _handleKeyPad,
-                    ),
-                    _buildCircleButton(
-                      icon: _speakerOn ? Icons.volume_up : Icons.hearing,
-                      label: 'Speaker',
-                      onTap: _toggleSpeaker,
-                    ),
-                  ],
-                ),
-
-              Spacer(),
-
-              // --- Nút Accept/Reject hoặc Hangup ---
-              Padding(
-                padding: const EdgeInsets.only(bottom: 32.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    if (call?.direction?.toLowerCase() == 'incoming' && !_callConfirmed)
-                      ...[
-                        // Nút Accept
-                        GestureDetector(
-                          onTap: _handleAccept,
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.phone, color: Colors.white, size: 36),
-                          ),
-                        ),
-                        SizedBox(width: 40),
-                        // Nút Reject
-                        GestureDetector(
-                          onTap: _handleHangup,
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(Icons.call_end, color: Colors.white, size: 36),
-                          ),
-                        ),
-                      ]
-                    else
-                      // Nút Hangup khi đã accept hoặc là cuộc gọi đi
-                      GestureDetector(
-                        onTap: call != null ? _handleHangup : null,
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.red,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Icon(Icons.call_end, color: Colors.white, size: 36),
-                        ),
+                  SizedBox(height: 18),
+                  Text(remoteName, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+                  SizedBox(height: 6),
+                  Text(remoteNumber, style: TextStyle(color: Colors.white70, fontSize: 18)),
+                ],
+              ),
+            ),
+            // Trạng thái kết nối hoặc thời gian
+            Align(
+              alignment: Alignment(0, 0.5),
+              child: isConnecting
+                  ? Text(
+                      'Đang kết nối...',
+                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w400),
+                    )
+                  : ValueListenableBuilder<String>(
+                      valueListenable: _timeLabel,
+                      builder: (context, value, child) => Text(
+                        value,
+                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w400),
                       ),
-                  ],
+                    ),
+            ),
+            // Nút kết thúc cuộc gọi
+            Align(
+              alignment: Alignment(0, 0.85),
+              child: GestureDetector(
+                onTap: call != null ? _handleHangup : null,
+                child: Container(
+                  width: 70,
+                  height: 70,
+                  decoration: BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(Icons.call_end, color: Colors.white, size: 36),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
-    );
-  }
-
-  /// Helper để tạo nút tròn với icon + label bên dưới
-  Widget _buildCircleButton({
-    required IconData icon,
-    required String label,
-    required VoidCallback onTap,
-  }) {
-    return Column(
-      children: [
-        InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(40),
-          child: Container(
-            width: 70,
-            height: 70,
-            decoration: BoxDecoration(
-              color: Colors.white12,
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: Colors.white, size: 28),
-          ),
-        ),
-        SizedBox(height: 8),
-        Text(
-          label,
-          style: TextStyle(color: Colors.white70, fontSize: 14),
-        ),
-      ],
     );
   }
 
@@ -979,7 +951,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
 
   @override
   void dispose() {
-    _timer.cancel();
+    if (_timer.isActive) _timer.cancel();
     _cleanUp();
     _disposeRenderers();
     super.dispose();

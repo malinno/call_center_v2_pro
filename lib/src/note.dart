@@ -75,7 +75,9 @@ class NoteWidget extends StatelessWidget {
                   children: [
                     Icon(Icons.sync, size: 90, color: Color(0xFF1DA1F2)), // Thay bằng ảnh minh họa nếu có
                     SizedBox(height: 18),
-                    Text('Chưa có dữ liệu', style: TextStyle(fontSize: 17, color: Color(0xFFB0B8C1), fontWeight: FontWeight.w500)),
+                    // Text('Chưa có dữ liệu', style: TextStyle(fontSize: 17, color: Color(0xFFB0B8C1), fontWeight: FontWeight.w500)),
+                    Text('Tính năng đang phát triển', style: TextStyle(fontSize: 17, color: Color(0xFFB0B8C1), fontWeight: FontWeight.w500)),
+
                   ],
                 ),
               ),

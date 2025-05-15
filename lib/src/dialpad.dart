@@ -17,6 +17,11 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
   final TextEditingController _numberController = TextEditingController();
   bool _isRegistered = false;
   bool _isRegistering = false;
+  int _selectedOption = 0; // 0: Ưu tiên gọi nội mạng, 1: Random đầu số gọi ra
+  List<bool> _optionChecked = [false, false]; // 2 tuỳ chọn, cho phép chọn nhiều
+  int _selectedPrefix = 0; // index của đầu số được chọn
+  final List<String> _prefixList = ['0996484060', '0387120550'];
+  List<bool> _carrierChecked = [false, false, false]; // Viettel, Vinaphone, Mobifone
 
   // Key definitions
   final List<List<Map<String, String>>> _keys = const [
@@ -148,6 +153,231 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
     }
   }
 
+  void _showOptionsSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Text(
+                      'Tuỳ chọn',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF222B45)),
+                    ),
+                  ),
+                  CheckboxListTile(
+                    value: _optionChecked[0],
+                    onChanged: (val) {
+                      setModalState(() => _optionChecked[0] = val!);
+                    },
+                    shape: CircleBorder(),
+                    title: Text('Ưu tiên gọi nội mạng', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text('Hệ thống ưu tiên chọn đầu số theo nhà mạng', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    activeColor: Color(0xFF1DA1F2),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  CheckboxListTile(
+                    value: _optionChecked[1],
+                    onChanged: (val) {
+                      setModalState(() => _optionChecked[1] = val!);
+                    },
+                    shape: CircleBorder(),
+                    title: Text('Random đầu số gọi ra', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text('Hệ thống chọn ngẫu nhiên đầu số khi gọi đi', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    activeColor: Color(0xFF1DA1F2),
+                    controlAffinity: ListTileControlAffinity.leading,
+                  ),
+                  SizedBox(height: 8),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showEditPrefixSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 16, left: 0, right: 0, bottom: 0),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Danh sách đầu số', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF222B45))),
+                          SizedBox(height: 2),
+                          Text('${_prefixList.length} giá trị', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      decoration: BoxDecoration(
+                        color: Color(0xFFF6F8FC),
+                        shape: BoxShape.circle,
+                      ),
+                      child: IconButton(
+                        icon: Icon(Icons.search, color: Color(0xFF222B45)),
+                        onPressed: () {},
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 8),
+              ...List.generate(_prefixList.length, (i) {
+                final isSelected = _selectedPrefix == i;
+                return Column(
+                  children: [
+                    RadioListTile<int>(
+                      value: i,
+                      groupValue: _selectedPrefix,
+                      onChanged: (val) {
+                        setState(() => _selectedPrefix = val!);
+                        Navigator.pop(context);
+                      },
+                      activeColor: Color(0xFF1DA1F2),
+                      title: Row(
+                        children: [
+                          Text(
+                            _prefixList[i],
+                            style: TextStyle(
+                              color: isSelected ? Color(0xFF1DA1F2) : Color(0xFF222B45),
+                              fontWeight: FontWeight.bold,
+                              fontSize: 17,
+                            ),
+                          ),
+                          SizedBox(width: 8),
+                          Image.asset(
+                            'lib/src/assets/images/soly.png',
+                            height: 16,
+                            fit: BoxFit.contain,
+                            errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.grey, size: 16),
+                          ),
+                        ],
+                      ),
+                      subtitle: Padding(
+                        padding: const EdgeInsets.only(left: 0, top: 2),
+                        child: Text('zsolution', style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                      ),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    if (i < _prefixList.length - 1)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        child: Divider(height: 1, color: Color(0xFFE6EAF0)),
+                      ),
+                  ],
+                );
+              }),
+              SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _showCarrierSheet() {
+    showModalBottomSheet(
+      context: context,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setModalState) {
+            return Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    child: Text(
+                      'Chọn nhà mạng ưu tiên',
+                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF222B45)),
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildCarrierIcon(0, 'Viettel', 'lib/src/assets/images/viettel.png', setModalState),
+                      _buildCarrierIcon(1, 'Vinaphone', 'lib/src/assets/images/vinaphone.png', setModalState),
+                      _buildCarrierIcon(2, 'Mobifone', 'lib/src/assets/images/mobifone.png', setModalState),
+                    ],
+                  ),
+                  SizedBox(height: 16),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildCarrierIcon(int idx, String label, String asset, void Function(void Function()) setModalState) {
+    final bool checked = _carrierChecked[idx];
+    return GestureDetector(
+      onTap: () {
+        setModalState(() {
+          _carrierChecked[idx] = !_carrierChecked[idx];
+        });
+        setState(() {}); // cập nhật badge ngoài
+      },
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: checked ? Color(0xFF1DA1F2).withOpacity(0.12) : Color(0xFFF6F8FC),
+              shape: BoxShape.circle,
+              border: Border.all(color: checked ? Color(0xFF1DA1F2) : Colors.transparent, width: 2),
+            ),
+            child: Center(
+              child: Image.asset(
+                asset,
+                width: 32,
+                height: 32,
+                fit: BoxFit.contain,
+                errorBuilder: (c, e, s) => Icon(Icons.sim_card, color: Colors.grey, size: 32),
+              ),
+            ),
+          ),
+          SizedBox(height: 6),
+          Text(label, style: TextStyle(fontSize: 13, color: checked ? Color(0xFF1DA1F2) : Color(0xFF222B45), fontWeight: checked ? FontWeight.bold : FontWeight.normal)),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final Color mainBlue = Color(0xFF223A5E);
@@ -174,7 +404,9 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back_ios_new, color: Colors.white),
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: () {
+                        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false, arguments: widget.helper);
+                      },
                     ),
                     Expanded(
                       child: Column(
@@ -184,7 +416,41 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              Text(selectedNumber, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                              if (_optionChecked[0] && _carrierChecked.contains(true))
+                                ...[
+                                  if (_carrierChecked[0])
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Image.asset(
+                                        'lib/src/assets/images/viettel.png',
+                                        height: 22,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
+                                      ),
+                                    ),
+                                  if (_carrierChecked[1])
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Image.asset(
+                                        'lib/src/assets/images/vinaphone.png',
+                                        height: 22,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
+                                      ),
+                                    ),
+                                  if (_carrierChecked[2])
+                                    Padding(
+                                      padding: const EdgeInsets.only(right: 8),
+                                      child: Image.asset(
+                                        'lib/src/assets/images/mobifone.png',
+                                        height: 22,
+                                        fit: BoxFit.contain,
+                                        errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
+                                      ),
+                                    ),
+                                ]
+                              else
+                                Text(selectedNumber, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
                               SizedBox(width: 8),
                               Image.asset(
                                 'lib/src/assets/images/soly.png',
@@ -207,9 +473,78 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                         ],
                       ),
                     ),
-                    IconButton(
-                      icon: Icon(Icons.edit, color: Colors.white),
-                      onPressed: () {},
+                    // GestureDetector(
+                    //   onTap: () {
+                    //     showMenu(
+                    //       context: context,
+                    //       position: RelativeRect.fromLTRB(
+                    //         MediaQuery.of(context).size.width,
+                    //         kToolbarHeight + 30,
+                    //         20,
+                    //         0,
+                    //       ),
+                    //       items: [
+                    //         PopupMenuItem(
+                    //           value: 'edit',
+                    //           child: Text('Chỉnh sửa đầu số'),
+                    //         ),
+                    //         PopupMenuItem(
+                    //           value: 'quick',
+                    //           child: Text('Quay số nhanh'),
+                    //         ),
+                    //       ],
+                    //     ).then((value) {
+                    //       if (value == 'edit') {
+                    //         // TODO: Xử lý chỉnh sửa đầu số
+                    //       } else if (value == 'quick') {
+                    //         // TODO: Xử lý quay số nhanh
+                    //       }
+                    //     });
+                    //   },
+                    //   child: Container(
+                    //     margin: EdgeInsets.only(right: 8),
+                    //     decoration: BoxDecoration(
+                    //       color: Color(0xFF223A5E),
+                    //       borderRadius: BorderRadius.circular(12),
+                    //     ),
+                    //     width: 44,
+                    //     height: 44,
+                    //     child: Icon(Icons.edit, color: Colors.white),
+                    //   ),
+                    // ),
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.settings, color: keyTextColor, size: 28),
+                          onPressed: () {
+                            _showOptionsSheet();
+                            if (_optionChecked[0]) {
+                              Future.delayed(Duration(milliseconds: 350), () {
+                                _showCarrierSheet();
+                              });
+                            }
+                          },
+                        ),
+                        if (_optionChecked.where((e) => e).length > 0)
+                          Positioned(
+                            right: 6,
+                            top: 8,
+                            child: Container(
+                              padding: EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: BoxConstraints(minWidth: 18, minHeight: 18),
+                              child: Center(
+                                child: Text(
+                                  '${_optionChecked.where((e) => e).length}',
+                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                   ],
                 ),
@@ -256,7 +591,7 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                       ),
                       Container(
                         decoration: BoxDecoration(
-                          color: lightBlue,
+                          color: Color(0xFF4CD964), // xanh lá
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
@@ -279,21 +614,21 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                           GestureDetector(
                             onTap: () => _append(keyData.keys.first),
                             child: Container(
-                              width: 70,
-                              height: 70,
-                              margin: EdgeInsets.symmetric(horizontal: 2),
+                              width: 100,
+                              height: 56,
+                              margin: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
-                                color: keyBgColor,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: borderColor, width: 1.2),
+                                color: Color(0xFFF6F8FC), // màu nền xám nhạt
+                                borderRadius: BorderRadius.circular(18),
                               ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Text(keyData.keys.first, style: TextStyle(color: keyTextColor, fontSize: 28, fontWeight: FontWeight.bold)),
-                                  if (keyData.values.first.isNotEmpty)
-                                    Text(keyData.values.first, style: TextStyle(color: Colors.grey, fontSize: 11)),
-                                ],
+                              alignment: Alignment.center,
+                              child: Text(
+                                keyData.keys.first,
+                                style: TextStyle(
+                                  color: Color(0xFF222B45), // màu đậm
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
                           ),
@@ -305,16 +640,47 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     // Nút cài đặt
-                    IconButton(
-                      icon: Icon(Icons.settings, color: keyTextColor, size: 28),
-                      onPressed: () {},
+                    Stack(
+                      children: [
+                        IconButton(
+                          icon: Icon(Icons.settings, color: keyTextColor, size: 28),
+                          onPressed: () {
+                            _showOptionsSheet();
+                            // Nếu đã chọn ưu tiên gọi nội mạng thì show chọn nhà mạng
+                            if (_optionChecked[0]) {
+                              Future.delayed(Duration(milliseconds: 350), () {
+                                _showCarrierSheet();
+                              });
+                            }
+                          },
+                        ),
+                        if (_carrierChecked.where((e) => e).length > 0)
+                          Positioned(
+                            right: 6,
+                            top: 8,
+                            child: Container(
+                              padding: EdgeInsets.all(3),
+                              decoration: BoxDecoration(
+                                color: Colors.red,
+                                shape: BoxShape.circle,
+                              ),
+                              constraints: BoxConstraints(minWidth: 18, minHeight: 18),
+                              child: Center(
+                                child: Text(
+                                  '${_carrierChecked.where((e) => e).length}',
+                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                ),
+                              ),
+                            ),
+                          ),
+                      ],
                     ),
                     // Nút gọi
                     GestureDetector(
                       onTap: _call,
                       child: Container(
-                        width: 64,
-                        height: 64,
+                        width: 68,
+                        height: 68,
                         decoration: BoxDecoration(
                           color: lightBlue,
                           shape: BoxShape.circle,

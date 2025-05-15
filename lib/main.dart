@@ -22,6 +22,7 @@ import 'src/main_tabs.dart';
 import 'src/z_solution_login_widget.dart';
 import 'src/providers/call_provider.dart';
 import 'src/widgets/call_handler.dart';
+import 'src/call_history.dart';
 
 final _logger = Logger();
 final FCMService _fcmService = FCMService();
@@ -193,11 +194,20 @@ class MyApp extends StatelessWidget {
       home: IntroScreen(),
       routes: {
         '/intro': (context) => IntroScreen(),
-        '/home': (context) => MainTabs(normalHelper),
-        '/dialpad': (context) => DialPadWidget(helper: normalHelper),
+        '/home': (context) {
+          final helper = ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
+          return MainTabs(helper ?? normalHelper);
+        },
+        '/dialpad': (context) {
+          final helper = ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
+          return DialPadWidget(helper: helper ?? normalHelper);
+        },
+        '/history': (context) {
+          final helper = ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
+          return CallHistoryWidget(helper: helper ?? normalHelper);
+        },
         '/register': (context) => RegisterWidget(normalHelper),
         '/zsolution': (context) => ZSolutionLoginWidget(helper: zSolutionHelper),
-        '/about': (context) => AboutWidget(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/callscreen') {
