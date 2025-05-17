@@ -221,7 +221,17 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-      NotificationHelper.showError(context, 'Đăng nhập thất bại: ${e.toString()}');
+      String errorMsg = 'Đăng nhập thất bại: ';
+      if (e.toString().contains('Failed host lookup')) {
+        errorMsg += 'Mất kết nối mạng. Vui lòng kiểm tra lại Internet!';
+      } else if (e.toString().contains('500')) {
+        errorMsg += 'Lỗi server. Vui lòng thử lại sau!';
+      } else if (e.toString().contains('Timeout')) {
+        errorMsg += 'Kết nối đến server bị timeout!';
+      } else {
+        errorMsg += e.toString();
+      }
+      NotificationHelper.showError(context, errorMsg);
     } finally {
       setState(() => _loading = false);
     }

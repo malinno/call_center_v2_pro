@@ -12,8 +12,6 @@ import 'src/providers/fcm_provider.dart';
 import 'src/theme_provider.dart';
 import 'src/user_state/sip_user_cubit.dart';
 import 'src/services/fcm_service.dart';
-
-import 'src/about.dart';
 import 'src/callscreen.dart';
 import 'src/dialpad.dart';
 import 'src/register.dart';
