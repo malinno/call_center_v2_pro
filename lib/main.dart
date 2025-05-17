@@ -21,6 +21,12 @@ import 'src/z_solution_login_widget.dart';
 import 'src/providers/call_provider.dart';
 import 'src/widgets/call_handler.dart';
 import 'src/call_history.dart';
+import 'src/call_center_info.dart';
+import 'src/change_password_screen.dart';
+import 'src/device_permission_screen.dart';
+import 'src/notification_settings_screen.dart';
+import 'src/call_sound_settings_screen.dart';
+import 'src/personal_info_screen.dart';
 
 final _logger = Logger();
 final FCMService _fcmService = FCMService();
@@ -35,7 +41,7 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
     _logger.d('Firebase initialized in background handler');
     _logger.d('Handling a background message: ${message.messageId}');
     _logger.d('Message data: ${message.data}');
-    
+
     // Xử lý thông báo cuộc gọi đến
     if (message.data['type'] == 'incoming_call') {
       final callId = message.data['call_id'] as String;
@@ -60,17 +66,19 @@ Future<void> initializeFirebase() async {
         options: DefaultFirebaseOptions.currentPlatform,
       );
       _logger.d('Firebase initialized successfully');
-      
+
       // Cấu hình Firebase Messaging
-      await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+      await FirebaseMessaging.instance
+          .setForegroundNotificationPresentationOptions(
         alert: true,
         badge: true,
         sound: true,
       );
 
       // Đăng ký xử lý thông báo khi app ở background
-      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
-      
+      FirebaseMessaging.onBackgroundMessage(
+          _firebaseMessagingBackgroundHandler);
+
       // Xử lý thông báo khi app ở foreground
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         _logger.d('Got a message whilst in the foreground!');
@@ -95,7 +103,7 @@ Future<void> initializeFirebase() async {
       });
 
       _logger.d('Firebase Messaging configured');
-      
+
       // Lấy FCM token
       String? token = await FirebaseMessaging.instance.getToken();
       _logger.d('FCM Token: $token');
@@ -193,19 +201,29 @@ class MyApp extends StatelessWidget {
       routes: {
         '/intro': (context) => IntroScreen(),
         '/home': (context) {
-          final helper = ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
+          final helper =
+              ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
           return MainTabs(helper ?? normalHelper);
         },
         '/dialpad': (context) {
-          final helper = ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
+          final helper =
+              ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
           return DialPadWidget(helper: helper ?? normalHelper);
         },
+        '/call_center_info': (context) => CallCenterInfoScreen(),
         '/history': (context) {
-          final helper = ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
+          final helper =
+              ModalRoute.of(context)?.settings.arguments as SIPUAHelper?;
           return CallHistoryWidget(helper: helper ?? normalHelper);
         },
         '/register': (context) => RegisterWidget(normalHelper),
-        '/zsolution': (context) => ZSolutionLoginWidget(helper: zSolutionHelper),
+        '/zsolution': (context) =>
+            ZSolutionLoginWidget(helper: zSolutionHelper),
+        '/change_password': (context) => ChangePasswordScreen(),
+        '/device_permission': (context) => DevicePermissionScreen(),
+        '/notification_settings': (context) => NotificationSettingsScreen(),
+        '/call_sound_settings': (context) => CallSoundSettingsScreen(),
+        '/personal_info': (context) => PersonalInfoScreen(),
       },
       onGenerateRoute: (settings) {
         if (settings.name == '/callscreen') {

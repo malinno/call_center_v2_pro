@@ -15,7 +15,7 @@ class _ContactWidgetState extends State<ContactWidget> {
   bool _loading = true;
   String _search = '';
   int _tabIndex = 0;
-  final List<String> _tabs = ['OMI', 'Nhân viên', 'Thiết bị'];
+  final List<String> _tabs = ['ZS', 'Nhân viên', 'Thiết bị'];
   final TextEditingController _searchController = TextEditingController();
   bool _hasPermission = false;
   bool _isRequestingPermission = false;
@@ -207,7 +207,7 @@ class _ContactWidgetState extends State<ContactWidget> {
     // Hiển thị danh sách cho tất cả các tab
     return ListView.builder(
       padding: EdgeInsets.only(top: 4),
-      itemCount: _tabIndex == 2 ? _filteredContacts.length : 10, // Giả lập 10 items cho OMI và Nhân viên
+      itemCount: _tabIndex == 2 ? _filteredContacts.length : 10,
       itemBuilder: (context, index) {
         if (_tabIndex == 2) {
           final contact = _filteredContacts[index];

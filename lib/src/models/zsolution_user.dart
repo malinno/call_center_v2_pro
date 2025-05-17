@@ -7,6 +7,7 @@ class ZSolutionUser {
   final String? host;
   final String? pass;
   final String? token;
+  final String? phone;
 
   ZSolutionUser({
     this.id,
@@ -17,6 +18,7 @@ class ZSolutionUser {
     this.host,
     this.pass,
     this.token,
+    this.phone,
   });
 
   factory ZSolutionUser.fromJson(Map<String, dynamic> json) {
@@ -29,6 +31,7 @@ class ZSolutionUser {
       host: json['host'],
       pass: json['pass'],
       token: json['token'],
+      phone: json['phone'],
     );
   }
 
@@ -40,13 +43,14 @@ class ZSolutionUser {
   bool get isAgent => roleName == 'Agent';
 
   Map<String, dynamic> toJson() => {
-    'id': id,
-    'userName': userName,
-    'email': email,
-    'roleName': roleName,
-    'extension': extension,
-    'host': host,
-    'pass': pass,
-    'token': token,
-  };
-} 
+        'id': id,
+        'userName': userName,
+        'email': email,
+        'roleName': roleName,
+        'extension': extension,
+        'host': host,
+        'pass': pass,
+        'token': token,
+        'phone': phone,
+      };
+}

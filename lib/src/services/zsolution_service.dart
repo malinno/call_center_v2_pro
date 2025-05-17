@@ -39,13 +39,13 @@ class ZSolutionService {
   ) async {
     try {
       final response = await request();
-      
+
       // Kiểm tra status 401
       if (response.statusCode == 401) {
         await _handleUnauthorized();
         throw Exception('Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.');
       }
-      
+
       return response;
     } catch (e) {
       rethrow;
@@ -69,12 +69,12 @@ class ZSolutionService {
 
     try {
       final response = await _makeRequest(() => http.get(
-        Uri.parse(ZSolutionConfig.companyServersUrl),
-        headers: {
-          ...ZSolutionConfig.defaultHeaders,
-          'Authorization': 'Bearer $_token',
-        },
-      ));
+            Uri.parse(ZSolutionConfig.companyServersUrl),
+            headers: {
+              ...ZSolutionConfig.defaultHeaders,
+              'Authorization': 'Bearer $_token',
+            },
+          ));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -89,7 +89,8 @@ class ZSolutionService {
               }
             }
           } else {
-            throw Exception(data['message'] ?? 'Không thể lấy thông tin server');
+            throw Exception(
+                data['message'] ?? 'Không thể lấy thông tin server');
           }
         }
       }
@@ -102,26 +103,28 @@ class ZSolutionService {
   static Future<ZSolutionUser> login(String email, String password) async {
     try {
       final response = await _makeRequest(() => http.post(
-        Uri.parse(ZSolutionConfig.loginUrl),
-        headers: ZSolutionConfig.defaultHeaders,
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      ));
+            Uri.parse(ZSolutionConfig.loginUrl),
+            headers: ZSolutionConfig.defaultHeaders,
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+            }),
+          ));
 
       if (response.statusCode == 200) {
         final jsonResponse = jsonDecode(response.body);
         if (jsonResponse['code'] == 200 && jsonResponse['data'] != null) {
           _token = jsonResponse['data']['token'];
-          
+          if (_token != null) {
+            final prefs = await SharedPreferences.getInstance();
+            await prefs.setString('zsolution_token', _token!);
+          }
           final userData = jsonResponse['data']['user'];
           if (userData == null) {
             throw Exception('Không tìm thấy thông tin người dùng');
           }
 
           final user = ZSolutionUser.fromJson(userData);
-          
           if (user.host == null || user.host!.isEmpty) {
             throw Exception('Không tìm thấy thông tin host');
           }
@@ -138,7 +141,8 @@ class ZSolutionService {
           throw Exception(errorMessage);
         }
       } else {
-        throw Exception('Đăng nhập thất bại: ${response.statusCode} - ${response.body}');
+        throw Exception(
+            'Đăng nhập thất bại: ${response.statusCode} - ${response.body}');
       }
     } catch (e) {
       throw Exception('Lỗi kết nối: $e');
@@ -153,25 +157,24 @@ class ZSolutionService {
 
     try {
       final serverId = await _getServerId();
-      
+
       final now = DateTime.now();
       final startDate = DateTime(now.year, now.month, 1);
       final startDateStr = startDate.toIso8601String();
 
       final response = await _makeRequest(() => http.post(
-        Uri.parse(ZSolutionConfig.callHistorySearchUrl),
-        headers: {
-          ...ZSolutionConfig.defaultHeaders,
-          'Authorization': 'Bearer $_token',
-        },
-        body: jsonEncode({
-          'pageIndex': 0,
-          'pageSize': ZSolutionConfig.defaultPageSize,
-          'serverId': serverId,
-          'startDate': startDateStr,
-        
-        }),
-      ));
+            Uri.parse(ZSolutionConfig.callHistorySearchUrl),
+            headers: {
+              ...ZSolutionConfig.defaultHeaders,
+              'Authorization': 'Bearer $_token',
+            },
+            body: jsonEncode({
+              'pageIndex': 0,
+              'pageSize': ZSolutionConfig.defaultPageSize,
+              'serverId': serverId,
+              'startDate': startDateStr,
+            }),
+          ));
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -195,8 +198,10 @@ class ZSolutionService {
     }
   }
 
-  static Future<List<Map<String, String>>> searchCallHistoryByPhone(String phoneNumber) async {
-    print('[ZSolutionService] searchCallHistoryByPhone gọi với số: $phoneNumber');
+  static Future<List<Map<String, String>>> searchCallHistoryByPhone(
+      String phoneNumber) async {
+    print(
+        '[ZSolutionService] searchCallHistoryByPhone gọi với số: $phoneNumber');
     await _loadToken();
     if (_token == null) {
       throw Exception('Chưa đăng nhập');
@@ -210,21 +215,22 @@ class ZSolutionService {
 
       print('[ZSolutionService] Đang gửi request tìm kiếm...');
       final response = await _makeRequest(() => http.post(
-        Uri.parse(ZSolutionConfig.callHistorySearchUrl),
-        headers: {
-          ...ZSolutionConfig.defaultHeaders,
-          'Authorization': 'Bearer $_token',
-        },
-        body: jsonEncode({
-          'pageIndex': 0,
-          'pageSize': ZSolutionConfig.defaultPageSize,
-          'serverId': serverId,
-          'startDate': startDateStr,
-          'phoneNumber': phoneNumber,
-        }),
-      ));
+            Uri.parse(ZSolutionConfig.callHistorySearchUrl),
+            headers: {
+              ...ZSolutionConfig.defaultHeaders,
+              'Authorization': 'Bearer $_token',
+            },
+            body: jsonEncode({
+              'pageIndex': 0,
+              'pageSize': ZSolutionConfig.defaultPageSize,
+              'serverId': serverId,
+              'startDate': startDateStr,
+              'phoneNumber': phoneNumber,
+            }),
+          ));
 
-      print('[ZSolutionService] Kết quả response: ${response.statusCode} - ${response.body}');
+      print(
+          '[ZSolutionService] Kết quả response: ${response.statusCode} - ${response.body}');
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         if (data != null && data['data'] != null) {
@@ -246,4 +252,37 @@ class ZSolutionService {
       throw Exception('Failed to load call history: $e');
     }
   }
-} 
+   static Future<void> updateProfile({
+    required int id,
+    required String userName,
+    required String email,
+    required String phone,
+  }) async {
+    await _loadToken();
+    if (_token == null) {
+      throw Exception('Chưa đăng nhập');
+    }
+    final url = '${ZSolutionConfig.baseUrl}/softphone/Users/update-profile';
+    final response = await _makeRequest(() => http.put(
+      Uri.parse(url),
+      headers: {
+        ...ZSolutionConfig.defaultHeaders,
+        'Authorization': 'Bearer $_token',
+      },
+      body: jsonEncode({
+        'id': id,
+        'userName': userName,
+        'email': email,
+        'phone': phone,
+      }),
+    ));
+    print("Cập nhật thông tin: ${response.body}");
+    if (response.statusCode != 200) {
+      throw Exception('Cập nhật thông tin thất bại: ${response.body}');
+    }
+    final jsonResponse = jsonDecode(response.body);
+    if (jsonResponse['code'] != 200) {
+      throw Exception(jsonResponse['message'] ?? 'Cập nhật thông tin thất bại');
+    }
+  }
+}

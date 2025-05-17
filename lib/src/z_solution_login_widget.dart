@@ -12,20 +12,24 @@ import 'package:loading_animation_widget/loading_animation_widget.dart';
 
 class ZSolutionLoginWidget extends StatefulWidget {
   final SIPUAHelper helper;
-  const ZSolutionLoginWidget({Key? key, required this.helper}) : super(key: key);
+  const ZSolutionLoginWidget({Key? key, required this.helper})
+      : super(key: key);
 
   @override
   State<ZSolutionLoginWidget> createState() => _ZSolutionLoginWidgetState();
 }
 
-class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements SipUaHelperListener {
+class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget>
+    implements SipUaHelperListener {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _loading = false;
   final _formKey = GlobalKey<FormState>();
   bool _rememberMe = false;
-  bool get isStarted => widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
-  bool get isRegistered => widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
+  bool get isStarted =>
+      widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
+  bool get isRegistered =>
+      widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
 
   @override
   void initState() {
@@ -53,7 +57,7 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
 
       // Hiển thị thông báo thành công
       NotificationHelper.showSuccess(context, 'Đăng nhập thành công');
-      
+
       // Chuyển sang màn hình chính với helper tương ứng
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
@@ -69,52 +73,45 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-      
+
       NotificationHelper.showError(context, 'Lỗi đăng ký SIP: ${state.cause}');
     } else if (state.state == RegistrationStateEnum.UNREGISTERED) {
       // Đóng dialog loading nếu đang mở
       if (Navigator.canPop(context)) {
         Navigator.of(context, rootNavigator: true).pop();
       }
-      
+
       NotificationHelper.showWarning(context, 'Đăng ký SIP bị hủy');
     }
   }
 
   @override
   void transportStateChanged(TransportState state) {
-   
     if (state.state == TransportStateEnum.CONNECTED) {
-     
       Future.delayed(Duration(milliseconds: 500), () {
         if (mounted) {
           try {
-            if (widget.helper.registerState.state != RegistrationStateEnum.REGISTERED) {
+            if (widget.helper.registerState.state !=
+                RegistrationStateEnum.REGISTERED) {
               widget.helper.register();
             }
-          } catch (e) {
-          
-          }
+          } catch (e) {}
         }
       });
     } else if (state.state == TransportStateEnum.DISCONNECTED) {
-    
       Future.delayed(Duration(seconds: 1), () {
         if (mounted) {
           try {
-            print('ZSolution - Connection lost, waiting for transport to reconnect...');
-          } catch (e) {
-           
-          }
+            print(
+                'ZSolution - Connection lost, waiting for transport to reconnect...');
+          } catch (e) {}
         }
       });
     }
   }
 
   @override
-  void callStateChanged(Call call, CallState state) {
-   
-  }
+  void callStateChanged(Call call, CallState state) {}
 
   @override
   void onNewMessage(SIPMessageRequest msg) {}
@@ -159,15 +156,12 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
       ),
     );
 
-    try { 
+    try {
       final user = await ZSolutionService.login(email, password);
       // Lưu thông tin user
       final prefs = await SharedPreferences.getInstance();
       final userJson = user.toJson();
       await prefs.setString('zsolution_user', jsonEncode(userJson));
-      if (user.token != null) {
-        await prefs.setString('zsolution_token', user.token!);
-      }
       if (_rememberMe) {
         await prefs.setString('zsolution_email', email);
         await prefs.setString('zsolution_password', password);
@@ -193,28 +187,29 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
 
         try {
           // Dừng kết nối cũ nếu tồn tại
-          if (widget.helper.registerState.state == RegistrationStateEnum.REGISTERED) {
+          if (widget.helper.registerState.state ==
+              RegistrationStateEnum.REGISTERED) {
             widget.helper.unregister();
           }
-          
+
           if (widget.helper.registerState.state != RegistrationStateEnum.NONE) {
             widget.helper.stop();
           }
 
           // Đợi một chút để đảm bảo kết nối cũ đã dừng
           await Future.delayed(Duration(seconds: 1));
-          
+
           // Khởi động kết nối mới
           await widget.helper.start(settings);
-          
+
           // Không đóng dialog loading ở đây, đợi cho đến khi SIP đăng ký thành công
           // Dialog sẽ được đóng trong registrationStateChanged khi REGISTERED
-
         } catch (e) {
           if (Navigator.canPop(context)) {
             Navigator.of(context, rootNavigator: true).pop();
           }
-          NotificationHelper.showError(context, 'Lỗi kết nối SIP: ${e.toString()}');
+          NotificationHelper.showError(
+              context, 'Lỗi kết nối SIP: ${e.toString()}');
         }
       }
     } catch (e) {
@@ -295,7 +290,8 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                         child: Container(
                           constraints: const BoxConstraints(minHeight: 650),
                           color: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 24, vertical: 32),
                           child: Form(
                             key: _formKey,
                             child: Column(
@@ -327,10 +323,14 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                 const SizedBox(height: 32),
                                 TextFormField(
                                   controller: _emailController,
-                                  validator: (value) => value == null || value.isEmpty ? 'Email là bắt buộc' : null,
+                                  validator: (value) =>
+                                      value == null || value.isEmpty
+                                          ? 'Email là bắt buộc'
+                                          : null,
                                   decoration: InputDecoration(
                                     labelText: 'Nhập email của bạn',
-                                    prefixIcon: const Icon(Icons.email_outlined),
+                                    prefixIcon:
+                                        const Icon(Icons.email_outlined),
                                     border: OutlineInputBorder(
                                       borderRadius: BorderRadius.circular(16),
                                     ),
@@ -342,7 +342,10 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                 TextFormField(
                                   controller: _passwordController,
                                   obscureText: true,
-                                  validator: (value) => value == null || value.isEmpty ? 'Mật khẩu là bắt buộc' : null,
+                                  validator: (value) =>
+                                      value == null || value.isEmpty
+                                          ? 'Mật khẩu là bắt buộc'
+                                          : null,
                                   decoration: InputDecoration(
                                     labelText: 'Nhập mật khẩu của bạn',
                                     prefixIcon: const Icon(Icons.lock_outline),
@@ -382,11 +385,13 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                       child: Container(
                                         decoration: const BoxDecoration(
                                           color: Color(0xFFf8d605),
-                                          borderRadius: BorderRadius.all(Radius.circular(16)),
+                                          borderRadius: BorderRadius.all(
+                                              Radius.circular(16)),
                                         ),
                                         alignment: Alignment.center,
                                         child: _loading
-                                            ? CircularProgressIndicator(color: Colors.white)
+                                            ? CircularProgressIndicator(
+                                                color: Colors.white)
                                             : const Text(
                                                 'Đăng Nhập',
                                                 style: TextStyle(
@@ -404,8 +409,11 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                   children: const [
                                     Expanded(child: Divider()),
                                     Padding(
-                                      padding: EdgeInsets.symmetric(horizontal: 8.0),
-                                      child: Text('Hoặc đăng nhập với', style: TextStyle(color: Colors.black45)),
+                                      padding:
+                                          EdgeInsets.symmetric(horizontal: 8.0),
+                                      child: Text('Hoặc đăng nhập với',
+                                          style:
+                                              TextStyle(color: Colors.black45)),
                                     ),
                                     Expanded(child: Divider()),
                                   ],
@@ -418,19 +426,26 @@ class _ZSolutionLoginWidgetState extends State<ZSolutionLoginWidget> implements 
                                       Navigator.pushReplacement(
                                         context,
                                         MaterialPageRoute(
-                                          builder: (context) => RegisterWidget(widget.helper),
+                                          builder: (context) =>
+                                              RegisterWidget(widget.helper),
                                         ),
                                       );
                                     },
                                     child: const Text(
                                       'Đăng nhập với Server',
-                                      style: TextStyle(color: Colors.black, fontWeight: FontWeight.w600),
+                                      style: TextStyle(
+                                          color: Colors.black,
+                                          fontWeight: FontWeight.w600),
                                     ),
                                     style: OutlinedButton.styleFrom(
-                                      side: const BorderSide(color: Color(0xFFE0E0E0)),
-                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                      side: const BorderSide(
+                                          color: Color(0xFFE0E0E0)),
+                                      shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(12)),
                                       backgroundColor: Colors.white,
-                                      padding: const EdgeInsets.symmetric(vertical: 14),
+                                      padding: const EdgeInsets.symmetric(
+                                          vertical: 14),
                                     ),
                                   ),
                                 ),

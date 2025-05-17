@@ -5,11 +5,11 @@ class ZSolutionConfig {
 
   // Authentication
   static const String loginUrl = '$baseUrl/softphone/Users/Login';
-  
+
   // Phone endpoints
   static const String phoneBaseUrl = '$baseUrl/softphone/Phones';
   static const String companyServersUrl = '$phoneBaseUrl/company/servers';
-  
+
   // Call History endpoints
   static const String callHistoryBaseUrl = '$baseUrl/softphone/CallHistory';
   static const String callHistorySearchUrl = '$callHistoryBaseUrl/search';
@@ -23,4 +23,7 @@ class ZSolutionConfig {
   // Other configurations
   static const int defaultPageSize = 50;
   static const int callHistoryDays = 7;
-} 
+
+  static const String changePasswordUrl =
+      '$baseUrl/softphone/Users/change-password';
+}
