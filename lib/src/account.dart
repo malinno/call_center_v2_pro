@@ -36,20 +36,13 @@ class _AccountWidgetState extends State<AccountWidget> {
     final prefs = await SharedPreferences.getInstance();
     setState(() {
       final zsolutionUserJson = prefs.getString('zsolution_user');
-      print('Loading zsolution_user from SharedPreferences:');
-      print('Raw JSON: $zsolutionUserJson');
+     
       if (zsolutionUserJson != null && zsolutionUserJson.isNotEmpty) {
         try {
           final Map<String, dynamic> jsonData = jsonDecode(zsolutionUserJson);
-          print('Parsed JSON data: $jsonData');
           _zsolutionUser = ZSolutionUser.fromJson(jsonData);
-          print('Parsed user data:');
-          print('Host: ${_zsolutionUser?.host}');
-          print('Extension: ${_zsolutionUser?.extension}');
-          print('Password: ${_zsolutionUser?.pass}');
           _isZSolutionLogin = true;
         } catch (e) {
-          print('Error parsing zsolution_user: $e');
           _isZSolutionLogin = false;
         }
       } else {
