@@ -1,5 +1,5 @@
 import 'package:bloc/bloc.dart';
-import 'package:dart_sip_ua_example/src/user_state/sip_user.dart';
+import 'package:call_center_pro/src/user_state/sip_user.dart';
 import 'package:sip_ua/sip_ua.dart';
 
 class SipUserCubit extends Cubit<SipUser?> {

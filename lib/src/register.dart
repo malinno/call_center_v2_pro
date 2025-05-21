@@ -1,5 +1,5 @@
-import 'package:dart_sip_ua_example/src/user_state/sip_user.dart';
-import 'package:dart_sip_ua_example/src/user_state/sip_user_cubit.dart';
+import 'package:call_center_pro/src/user_state/sip_user.dart';
+import 'package:call_center_pro/src/user_state/sip_user_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';

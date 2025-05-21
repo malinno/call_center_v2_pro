@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:sip_ua/sip_ua.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'widgets/action_button.dart';
 
 enum Originator {
@@ -134,6 +135,56 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
       }
     } catch (e) {
       print('Error initializing audio session: $e');
+    }
+  }
+
+  Future<bool> _checkMicrophonePermission() async {
+    var status = await Permission.microphone.status;
+    if (status.isDenied) {
+      status = await Permission.microphone.request();
+    }
+    
+    if (status.isPermanentlyDenied) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Cần quyền truy cập microphone'),
+            content: Text('Ứng dụng cần quyền truy cập microphone để thực hiện cuộc gọi. Vui lòng cấp quyền trong Cài đặt.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Hủy'),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(context);
+                  openAppSettings();
+                },
+                child: Text('Mở Cài đặt'),
+              ),
+            ],
+          ),
+        );
+      }
+      return false;
+    }
+    
+    return status.isGranted;
+  }
+
+  Future<void> _handleCall() async {
+    if (!await _checkMicrophonePermission()) {
+      return;
+    }
+    
+    // Tiếp tục xử lý cuộc gọi nếu đã có quyền
+    if (call != null) {
+      if (call!.state == CallStateEnum.CONFIRMED) {
+        call!.hangup();
+      } else {
+        call!.answer(helper!.buildCallOptions(call!.voiceOnly));
+      }
     }
   }
 
@@ -552,172 +603,43 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   }
 
   Widget _buildActionButtons() {
-    print('CallScreen - Building action buttons, state: $_state, direction: ${call?.direction}, confirmed: $_callConfirmed');
-    
-    final hangupBtn = ActionButton(
-      title: "hangup",
-      onPressed: () => _handleHangup(),
-      icon: Icons.call_end,
-      fillColor: Colors.red,
-    );
-
-    final hangupBtnInactive = ActionButton(
-      title: "hangup",
-      onPressed: () {},
-      icon: Icons.call_end,
-      fillColor: Colors.grey,
-    );
-
-    final basicActions = <Widget>[];
-    final advanceActions = <Widget>[];
-    final advanceActions2 = <Widget>[];
-
-    if (call?.direction?.toLowerCase() == 'incoming' && !_callConfirmed) {
-      print('CallScreen - Showing accept/reject buttons');
-      basicActions.add(ActionButton(
-        title: "Accept",
-        fillColor: Colors.green,
-        icon: Icons.phone,
-        onPressed: () => _handleAccept(),
-      ));
-      basicActions.add(hangupBtn);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        mainAxisAlignment: MainAxisAlignment.end,
+    return Container(
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          Padding(
-            padding: const EdgeInsets.all(3),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: basicActions,
-            ),
+          ActionButton(
+            icon: Icons.mic,
+            fillColor: _audioMuted ? Colors.red : Colors.white,
+            onPressed: () {
+              if (call != null) {
+                if (_audioMuted) {
+                  call!.unmute(true, false);
+                } else {
+                  call!.mute(true, false);
+                }
+              }
+            },
+          ),
+          ActionButton(
+            icon: Icons.call_end,
+            fillColor: Colors.red,
+            onPressed: _handleCall,
+          ),
+          ActionButton(
+            icon: Icons.videocam,
+            fillColor: _videoMuted ? Colors.red : Colors.white,
+            onPressed: () {
+              if (call != null) {
+                if (_videoMuted) {
+                  call!.unmute(false, true);
+                } else {
+                  call!.mute(false, true);
+                }
+              }
+            },
           ),
         ],
-      );
-    }
-
-    switch (_state) {
-      case CallStateEnum.ACCEPTED:
-      case CallStateEnum.CONFIRMED:
-        {
-          advanceActions.add(ActionButton(
-            title: _audioMuted ? 'unmute' : 'mute',
-            icon: _audioMuted ? Icons.mic_off : Icons.mic,
-            checked: _audioMuted,
-            onPressed: () => _muteAudio(),
-          ));
-
-          if (voiceOnly) {
-            advanceActions.add(ActionButton(
-              title: "keypad",
-              icon: Icons.dialpad,
-              onPressed: () => _handleKeyPad(),
-            ));
-          } else {
-            advanceActions.add(ActionButton(
-              title: "switch camera",
-              icon: Icons.switch_video,
-              onPressed: () => _switchCamera(),
-            ));
-          }
-
-          if (voiceOnly) {
-            advanceActions.add(ActionButton(
-              title: _speakerOn ? 'speaker off' : 'speaker on',
-              icon: _speakerOn ? Icons.volume_off : Icons.volume_up,
-              checked: _speakerOn,
-              onPressed: () => _toggleSpeaker(),
-            ));
-            advanceActions2.add(ActionButton(
-              title: 'request video',
-              icon: Icons.videocam,
-              onPressed: () => _handleVideoUpgrade(),
-            ));
-          } else {
-            advanceActions.add(ActionButton(
-              title: _videoMuted ? "camera on" : 'camera off',
-              icon: _videoMuted ? Icons.videocam : Icons.videocam_off,
-              checked: _videoMuted,
-              onPressed: () => _muteVideo(),
-            ));
-          }
-
-          basicActions.add(ActionButton(
-            title: _hold ? 'unhold' : 'hold',
-            icon: _hold ? Icons.play_arrow : Icons.pause,
-            checked: _hold,
-            onPressed: () => _handleHold(),
-          ));
-
-          basicActions.add(hangupBtn);
-
-          if (_showNumPad) {
-            basicActions.add(ActionButton(
-              title: "back",
-              icon: Icons.keyboard_arrow_down,
-              onPressed: () => _handleKeyPad(),
-            ));
-          } else {
-            basicActions.add(ActionButton(
-              title: "transfer",
-              icon: Icons.phone_forwarded,
-              onPressed: () => _handleTransfer(),
-            ));
-          }
-        }
-        break;
-      case CallStateEnum.FAILED:
-      case CallStateEnum.ENDED:
-        basicActions.add(hangupBtnInactive);
-        break;
-      case CallStateEnum.PROGRESS:
-        basicActions.add(hangupBtn);
-        break;
-      default:
-        print('Other state => $_state');
-        break;
-    }
-
-    final actionWidgets = <Widget>[];
-
-    if (_showNumPad) {
-      actionWidgets.addAll(_buildNumPad());
-    } else {
-      if (advanceActions2.isNotEmpty) {
-        actionWidgets.add(
-          Padding(
-            padding: const EdgeInsets.all(3),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: advanceActions2),
-          ),
-        );
-      }
-      if (advanceActions.isNotEmpty) {
-        actionWidgets.add(
-          Padding(
-            padding: const EdgeInsets.all(3),
-            child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: advanceActions),
-          ),
-        );
-      }
-    }
-
-    actionWidgets.add(
-      Padding(
-        padding: const EdgeInsets.all(3),
-        child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: basicActions),
       ),
-    );
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
-      mainAxisAlignment: MainAxisAlignment.end,
-      children: actionWidgets,
     );
   }
 
