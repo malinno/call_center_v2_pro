@@ -6,24 +6,19 @@ import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:sip_ua/sip_ua.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'widgets/action_button.dart';
+import 'call_history.dart';
 
-enum Originator {
-  local,
-  remote,
-  system
-}
+enum Originator { local, remote, system }
 
-enum Direction {
-  incoming,
-  outgoing
-}
+enum Direction { incoming, outgoing }
 
 class CallScreenWidget extends StatefulWidget {
   final SIPUAHelper? _helper;
   final Call? _call;
   final String? source;
 
-  CallScreenWidget(this._helper, this._call, {this.source, Key? key}) : super(key: key);
+  CallScreenWidget(this._helper, this._call, {this.source, Key? key})
+      : super(key: key);
 
   @override
   State<CallScreenWidget> createState() => _MyCallScreenWidget();
@@ -53,10 +48,13 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   late String _transferTarget;
   late Timer _timer;
   DateTime? _callStartTime;
+  int _talkDuration = 0;
+  Timer? _talkTimer;
 
   SIPUAHelper? get helper => widget._helper;
 
-  bool get voiceOnly => call?.voiceOnly == true && call?.remote_has_video != true;
+  bool get voiceOnly =>
+      call?.voiceOnly == true && call?.remote_has_video != true;
 
   String? get remoteIdentity => call?.remote_identity;
 
@@ -72,13 +70,16 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   @override
   initState() {
     super.initState();
-    print('CallScreen - initState, call direction: ${call?.direction}');
+    _talkDuration = 0;
+    print(
+        'CallScreen - initState, call direction: ${call?.direction}, state: ${call?.state}');
     _initRenderers();
     helper!.addSipUaHelperListener(this);
     _callConfirmed = false;
     _state = CallStateEnum.NONE;
-    _timer = Timer(Duration(days: 365), () {}); // Dummy timer để tránh LateInitializationError
-    
+    _timer = Timer(Duration(days: 365),
+        () {}); // Dummy timer để tránh LateInitializationError
+
     // Khởi tạo audio session
     if (!kIsWeb) {
       _initAudioSession();
@@ -143,14 +144,15 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     if (status.isDenied) {
       status = await Permission.microphone.request();
     }
-    
+
     if (status.isPermanentlyDenied) {
       if (mounted) {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
             title: Text('Cần quyền truy cập microphone'),
-            content: Text('Ứng dụng cần quyền truy cập microphone để thực hiện cuộc gọi. Vui lòng cấp quyền trong Cài đặt.'),
+            content: Text(
+                'Ứng dụng cần quyền truy cập microphone để thực hiện cuộc gọi. Vui lòng cấp quyền trong Cài đặt.'),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
@@ -169,7 +171,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
       }
       return false;
     }
-    
+
     return status.isGranted;
   }
 
@@ -177,7 +179,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     if (!await _checkMicrophonePermission()) {
       return;
     }
-    
+
     // Tiếp tục xử lý cuộc gọi nếu đã có quyền
     if (call != null) {
       if (call!.state == CallStateEnum.CONFIRMED) {
@@ -190,95 +192,51 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
 
   @override
   void callStateChanged(Call call, CallState state) {
-    // Nếu là cuộc gọi đến và chưa được xác nhận
-    if (call.direction?.toLowerCase() == 'incoming' && !_callConfirmed) {
-      switch (state.state) {
-        case CallStateEnum.CALL_INITIATION:
-        case CallStateEnum.PROGRESS:
-          setState(() {});
-          break;
-        case CallStateEnum.ENDED:
-        case CallStateEnum.FAILED:
-          if (widget.source == 'history') {
-            Navigator.of(context).pop();
-          } else {
-            Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
-          }
-          break;
-        default:
-          break;
-      }
-      return;
-    }
+    print(
+        'CallScreen - callStateChanged: state=${state.state}, direction=${call.direction}, _callConfirmed=$_callConfirmed, _state=$_state, remote_identity=${call.remote_identity}');
 
-    // Xử lý các trạng thái khác cho cuộc gọi đã được xác nhận
-    if (state.state == CallStateEnum.HOLD ||
-        state.state == CallStateEnum.UNHOLD) {
-      _hold = state.state == CallStateEnum.HOLD;
-      if (state.originator == 'local') {
-        _holdOriginator = Originator.local;
-      } else if (state.originator == 'remote') {
-        _holdOriginator = Originator.remote;
-      } else if (state.originator == 'system') {
-        _holdOriginator = Originator.system;
-      }
-      setState(() {});
-      return;
-    }
-
-    if (state.state == CallStateEnum.MUTED) {
-      if (state.audio!) _audioMuted = true;
-      if (state.video!) _videoMuted = true;
-      setState(() {});
-      return;
-    }
-
-    if (state.state == CallStateEnum.UNMUTED) {
-      if (state.audio!) _audioMuted = false;
-      if (state.video!) _videoMuted = false;
-      setState(() {});
-      return;
-    }
-
-    // Cập nhật trạng thái cho cuộc gọi đã được xác nhận
-    if (state.state != CallStateEnum.STREAM) {
-      _state = state.state;
-    }
+    // Cập nhật trạng thái cuộc gọi
+    _state = state.state;
 
     switch (state.state) {
-      case CallStateEnum.STREAM:
-        if (_callConfirmed) {
-          _handleStreams(state);
-        }
+      case CallStateEnum.CONFIRMED:
+        print('CallScreen - Call CONFIRMED, setting _callConfirmed to true');
+        setState(() {
+          _callConfirmed = true;
+        });
+        _startTimer();
         break;
       case CallStateEnum.ENDED:
       case CallStateEnum.FAILED:
+        print(
+            'CallScreen - Call ENDED/FAILED, _callConfirmed=$_callConfirmed, direction=${call.direction}');
+        if (call.direction?.toLowerCase() == 'outgoing') {
+          print(
+              'CallScreen - Saving call history for outgoing call, missed=${!_callConfirmed}, remote=${call.remote_identity}');
+          saveCallHistory(call.remote_identity ?? '', missed: !_callConfirmed);
+        }
         if (widget.source == 'history') {
           Navigator.of(context).pop();
         } else {
-          Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+          Navigator.of(context).pushNamedAndRemoveUntil(
+              '/dialpad', (route) => false,
+              arguments: helper);
         }
         break;
       case CallStateEnum.ACCEPTED:
-      case CallStateEnum.CONFIRMED:
-        if (!_callConfirmed) {
-          setState(() {
-            _callConfirmed = true;
-          });
-          _startTimer();
-        } else {
-          setState(() {});
-        }
+        print('CallScreen - Call ACCEPTED');
+        setState(() {});
         break;
-      case CallStateEnum.UNMUTED:
-      case CallStateEnum.MUTED:
-      case CallStateEnum.CONNECTING:
       case CallStateEnum.PROGRESS:
-      case CallStateEnum.HOLD:
-      case CallStateEnum.UNHOLD:
-      case CallStateEnum.NONE:
+        print('CallScreen - Call PROGRESS');
+        setState(() {});
+        break;
       case CallStateEnum.CALL_INITIATION:
-      case CallStateEnum.REFER:
+        print('CallScreen - Call INITIATION');
+        setState(() {});
+        break;
+      default:
+        print('CallScreen - Other state: ${state.state}');
         setState(() {});
         break;
     }
@@ -299,7 +257,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
         _localStream!.dispose();
         _localStream = null;
       }
-      
+
       if (_remoteStream != null) {
         for (var track in _remoteStream!.getTracks()) {
           track.stop();
@@ -315,7 +273,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   void _handleHangup() {
     print('CallScreen - _handleHangup called, source: ${widget.source}');
     try {
-      if (call != null && call!.state != CallStateEnum.ENDED && call!.state != CallStateEnum.FAILED) {
+      if (call != null &&
+          call!.state != CallStateEnum.ENDED &&
+          call!.state != CallStateEnum.FAILED) {
         call!.hangup({'status_code': 603});
       }
     } catch (e) {
@@ -335,7 +295,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
         Navigator.of(context).pop();
       } else {
         // Nếu gọi từ màn dialpad thì quay về màn dialpad
-        Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+        Navigator.of(context).pushNamedAndRemoveUntil(
+            '/dialpad', (route) => false,
+            arguments: helper);
       }
     }
   }
@@ -350,7 +312,9 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
         Navigator.of(context).pop();
       } else {
         // Nếu gọi từ màn dialpad thì quay về màn dialpad
-        Navigator.of(context).pushNamedAndRemoveUntil('/dialpad', (route) => false, arguments: helper);
+        Navigator.of(context).pushNamedAndRemoveUntil(
+            '/dialpad', (route) => false,
+            arguments: helper);
       }
     }
   }
@@ -359,11 +323,13 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
     MediaStream? stream = event.stream;
     if (stream == null) return;
 
+    print(
+        'CallScreen - _handleStreams: originator=${event.originator}, state=${_state}, _callConfirmed=$_callConfirmed');
+
     if (event.originator == 'local') {
       if (_localRenderer != null) {
         _localRenderer!.srcObject = stream;
       }
-
       if (!kIsWeb) {
         final audioTracks = stream.getAudioTracks();
         if (audioTracks.isNotEmpty) {
@@ -373,12 +339,16 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
       _localStream = stream;
     }
     if (event.originator == 'remote') {
+      print(
+          'CallScreen - Received remote stream, setting _callConfirmed to true');
       if (_remoteRenderer != null) {
         _remoteRenderer!.srcObject = stream;
       }
       _remoteStream = stream;
+      setState(() {
+        _callConfirmed = true;
+      });
     }
-
     setState(() {
       _resizeLocalVideo();
     });
@@ -433,7 +403,8 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
         if (!remoteHasVideo) {
           mediaConstraints['video'] = false;
         }
-        mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+        mediaStream =
+            await navigator.mediaDevices.getUserMedia(mediaConstraints);
       }
 
       // Cấu hình audio trước khi answer
@@ -735,7 +706,8 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   @override
   Widget build(BuildContext context) {
     final Color bgColor = const Color(0xFF22304A); // Màu nền xanh đậm
-    final String myNumber = '0996484060'; // Số của bạn (có thể lấy động nếu cần)
+    final String myNumber =
+        '0996484060'; // Số của bạn (có thể lấy động nếu cần)
     final String callTime = _callStartTime != null
         ? "${_callStartTime!.hour.toString().padLeft(2, '0')}:${_callStartTime!.minute.toString().padLeft(2, '0')}"
         : '';
@@ -756,14 +728,16 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
                 children: [
                   Icon(Icons.phone, color: Colors.white70, size: 18),
                   SizedBox(width: 6),
-                  Text(myNumber, style: TextStyle(color: Colors.white70, fontSize: 15)),
+                  Text(myNumber,
+                      style: TextStyle(color: Colors.white70, fontSize: 15)),
                 ],
               ),
             ),
             Positioned(
               top: 16,
               right: 16,
-              child: Text('Cuộc gọi đi $callTime', style: TextStyle(color: Colors.white70, fontSize: 15)),
+              child: Text('Cuộc gọi đi $callTime',
+                  style: TextStyle(color: Colors.white70, fontSize: 15)),
             ),
             // Avatar + tên + số
             Align(
@@ -777,9 +751,14 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
                     child: Icon(Icons.person, color: Colors.white, size: 60),
                   ),
                   SizedBox(height: 18),
-                  Text(remoteName, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w600)),
+                  Text(remoteName,
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 20,
+                          fontWeight: FontWeight.w600)),
                   SizedBox(height: 6),
-                  Text(remoteNumber, style: TextStyle(color: Colors.white70, fontSize: 18)),
+                  Text(remoteNumber,
+                      style: TextStyle(color: Colors.white70, fontSize: 18)),
                 ],
               ),
             ),
@@ -789,13 +768,19 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
               child: isConnecting
                   ? Text(
                       'Đang kết nối...',
-                      style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w400),
+                      style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.w400),
                     )
                   : ValueListenableBuilder<String>(
                       valueListenable: _timeLabel,
                       builder: (context, value, child) => Text(
                         value,
-                        style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w400),
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 22,
+                            fontWeight: FontWeight.w400),
                       ),
                     ),
             ),
@@ -874,6 +859,7 @@ class _MyCallScreenWidget extends State<CallScreenWidget>
   @override
   void dispose() {
     if (_timer.isActive) _timer.cancel();
+    if (_talkTimer != null) _talkTimer!.cancel();
     _cleanUp();
     _disposeRenderers();
     super.dispose();

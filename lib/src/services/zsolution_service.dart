@@ -186,9 +186,13 @@ class ZSolutionService {
                 'src': item['src']?.toString() ?? '',
                 'dst': item['dst']?.toString() ?? '',
                 'callDate': item['callDate']?.toString() ?? '',
+                'callStatus': item['callStatus']?.toString() ?? '',
+                'billSec': item['billSec']?.toString() ?? '',
+                'duration': item['duration']?.toString() ?? '',
+                'recordingFile': item['recordingFile']?.toString() ?? '',
               };
             }
-            return {'src': '', 'dst': '', 'callDate': ''};
+            return {'src': '', 'dst': '', 'callDate': '', 'callStatus': '', 'billSec': '', 'duration': '', 'recordingFile': ''};
           }).toList();
         }
       }

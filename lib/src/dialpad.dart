@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
+import 'package:flutter/foundation.dart'
+    show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sip_ua/sip_ua.dart';
@@ -13,7 +14,8 @@ class DialPadWidget extends StatefulWidget {
   _DialPadWidgetState createState() => _DialPadWidgetState();
 }
 
-class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperListener {
+class _DialPadWidgetState extends State<DialPadWidget>
+    implements SipUaHelperListener {
   final TextEditingController _numberController = TextEditingController();
   bool _isRegistered = false;
   bool _isRegistering = false;
@@ -21,22 +23,44 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
   List<bool> _optionChecked = [false, false]; // 2 tuỳ chọn, cho phép chọn nhiều
   int _selectedPrefix = 0; // index của đầu số được chọn
   final List<String> _prefixList = ['0996484060', '0387120550'];
-  List<bool> _carrierChecked = [false, false, false]; // Viettel, Vinaphone, Mobifone
+  List<bool> _carrierChecked = [
+    false,
+    false,
+    false
+  ]; // Viettel, Vinaphone, Mobifone
 
   // Key definitions
   final List<List<Map<String, String>>> _keys = const [
-    [ {'1': ''}, {'2': 'ABC'}, {'3': 'DEF'} ],
-    [ {'4': 'GHI'}, {'5': 'JKL'}, {'6': 'MNO'} ],
-    [ {'7': 'PQRS'}, {'8': 'TUV'}, {'9': 'WXYZ'} ],
-    [ {'*': ''}, {'0': '+'}, {'#': ''} ],
+    [
+      {'1': ''},
+      {'2': 'ABC'},
+      {'3': 'DEF'}
+    ],
+    [
+      {'4': 'GHI'},
+      {'5': 'JKL'},
+      {'6': 'MNO'}
+    ],
+    [
+      {'7': 'PQRS'},
+      {'8': 'TUV'},
+      {'9': 'WXYZ'}
+    ],
+    [
+      {'*': ''},
+      {'0': '+'},
+      {'#': ''}
+    ],
   ];
 
   @override
   void initState() {
     super.initState();
     widget.helper.addSipUaHelperListener(this);
-    _isRegistered = widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
-    print('DialPad initState - Current registration state: ${widget.helper.registerState.state}');
+    _isRegistered =
+        widget.helper.registerState.state == RegistrationStateEnum.REGISTERED;
+    print(
+        'DialPad initState - Current registration state: ${widget.helper.registerState.state}');
   }
 
   @override
@@ -63,22 +87,16 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
   @override
   void callStateChanged(Call call, CallState state) async {
     if (state.state == CallStateEnum.CALL_INITIATION) {
-      await saveCallHistory(call.remote_identity ?? '');
       if (mounted) {
         await Navigator.pushNamed(
           context,
           '/callscreen',
           arguments: call,
         );
-        setState(() => _numberController.clear());
+        if (mounted) setState(() => _numberController.clear());
       }
     }
-    if (state.state == CallStateEnum.FAILED) {
-      await saveCallHistory(call.remote_identity ?? '', missed: true);
-      if (mounted && Navigator.canPop(context)) {
-        Navigator.pop(context);
-      }
-    }
+    // KHÔNG LƯU LỊCH SỬ Ở ĐÂY!
   }
 
   Future<void> _call() async {
@@ -94,7 +112,9 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
     var status = await Permission.microphone.request();
     if (status != PermissionStatus.granted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Cần cấp quyền truy cập microphone để thực hiện cuộc gọi')),
+        SnackBar(
+            content: Text(
+                'Cần cấp quyền truy cập microphone để thực hiện cuộc gọi')),
       );
       return;
     }
@@ -106,7 +126,8 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
         widget.helper.register();
         // Đợi đăng ký thành công
         await Future.delayed(Duration(seconds: 2));
-        if (widget.helper.registerState.state != RegistrationStateEnum.REGISTERED) {
+        if (widget.helper.registerState.state !=
+            RegistrationStateEnum.REGISTERED) {
           throw Exception('Không thể đăng ký SIP');
         }
       } catch (e) {
@@ -128,7 +149,7 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
       );
       if (mounted) {
         await Navigator.pushNamed(
-          context, 
+          context,
           '/callscreen',
           arguments: call,
         );
@@ -169,10 +190,14 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                     child: Text(
                       'Tuỳ chọn',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF222B45)),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF222B45)),
                     ),
                   ),
                   CheckboxListTile(
@@ -181,8 +206,11 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                       setModalState(() => _optionChecked[0] = val!);
                     },
                     shape: CircleBorder(),
-                    title: Text('Ưu tiên gọi nội mạng', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    subtitle: Text('Hệ thống ưu tiên chọn đầu số theo nhà mạng', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    title: Text('Ưu tiên gọi nội mạng',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text('Hệ thống ưu tiên chọn đầu số theo nhà mạng',
+                        style: TextStyle(fontSize: 13, color: Colors.grey)),
                     activeColor: Color(0xFF1DA1F2),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
@@ -192,8 +220,11 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                       setModalState(() => _optionChecked[1] = val!);
                     },
                     shape: CircleBorder(),
-                    title: Text('Random đầu số gọi ra', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
-                    subtitle: Text('Hệ thống chọn ngẫu nhiên đầu số khi gọi đi', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    title: Text('Random đầu số gọi ra',
+                        style: TextStyle(
+                            fontWeight: FontWeight.w600, fontSize: 16)),
+                    subtitle: Text('Hệ thống chọn ngẫu nhiên đầu số khi gọi đi',
+                        style: TextStyle(fontSize: 13, color: Colors.grey)),
                     activeColor: Color(0xFF1DA1F2),
                     controlAffinity: ListTileControlAffinity.leading,
                   ),
@@ -221,16 +252,23 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
                 child: Row(
                   children: [
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Danh sách đầu số', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF222B45))),
+                          Text('Danh sách đầu số',
+                              style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Color(0xFF222B45))),
                           SizedBox(height: 2),
-                          Text('${_prefixList.length} giá trị', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                          Text('${_prefixList.length} giá trị',
+                              style:
+                                  TextStyle(fontSize: 13, color: Colors.grey)),
                         ],
                       ),
                     ),
@@ -265,7 +303,9 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                           Text(
                             _prefixList[i],
                             style: TextStyle(
-                              color: isSelected ? Color(0xFF1DA1F2) : Color(0xFF222B45),
+                              color: isSelected
+                                  ? Color(0xFF1DA1F2)
+                                  : Color(0xFF222B45),
                               fontWeight: FontWeight.bold,
                               fontSize: 17,
                             ),
@@ -275,15 +315,19 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                             'lib/src/assets/images/soly.png',
                             height: 16,
                             fit: BoxFit.contain,
-                            errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.grey, size: 16),
+                            errorBuilder: (c, e, s) =>
+                                Icon(Icons.image, color: Colors.grey, size: 16),
                           ),
                         ],
                       ),
                       subtitle: Padding(
                         padding: const EdgeInsets.only(left: 0, top: 2),
-                        child: Text('zsolution', style: TextStyle(fontSize: 12, color: Colors.blueGrey)),
+                        child: Text('zsolution',
+                            style: TextStyle(
+                                fontSize: 12, color: Colors.blueGrey)),
                       ),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
                     ),
                     if (i < _prefixList.length - 1)
                       Padding(
@@ -317,19 +361,26 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                     child: Text(
                       'Chọn nhà mạng ưu tiên',
-                      style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF222B45)),
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF222B45)),
                     ),
                   ),
                   SizedBox(height: 12),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _buildCarrierIcon(0, 'Viettel', 'lib/src/assets/images/viettel.png', setModalState),
-                      _buildCarrierIcon(1, 'Vinaphone', 'lib/src/assets/images/vinaphone.png', setModalState),
-                      _buildCarrierIcon(2, 'Mobifone', 'lib/src/assets/images/mobifone.png', setModalState),
+                      _buildCarrierIcon(0, 'Viettel',
+                          'lib/src/assets/images/viettel.png', setModalState),
+                      _buildCarrierIcon(1, 'Vinaphone',
+                          'lib/src/assets/images/vinaphone.png', setModalState),
+                      _buildCarrierIcon(2, 'Mobifone',
+                          'lib/src/assets/images/mobifone.png', setModalState),
                     ],
                   ),
                   SizedBox(height: 16),
@@ -342,7 +393,8 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
     );
   }
 
-  Widget _buildCarrierIcon(int idx, String label, String asset, void Function(void Function()) setModalState) {
+  Widget _buildCarrierIcon(int idx, String label, String asset,
+      void Function(void Function()) setModalState) {
     final bool checked = _carrierChecked[idx];
     return GestureDetector(
       onTap: () {
@@ -357,9 +409,13 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
             width: 56,
             height: 56,
             decoration: BoxDecoration(
-              color: checked ? Color(0xFF1DA1F2).withOpacity(0.12) : Color(0xFFF6F8FC),
+              color: checked
+                  ? Color(0xFF1DA1F2).withOpacity(0.12)
+                  : Color(0xFFF6F8FC),
               shape: BoxShape.circle,
-              border: Border.all(color: checked ? Color(0xFF1DA1F2) : Colors.transparent, width: 2),
+              border: Border.all(
+                  color: checked ? Color(0xFF1DA1F2) : Colors.transparent,
+                  width: 2),
             ),
             child: Center(
               child: Image.asset(
@@ -367,12 +423,17 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                 width: 32,
                 height: 32,
                 fit: BoxFit.contain,
-                errorBuilder: (c, e, s) => Icon(Icons.sim_card, color: Colors.grey, size: 32),
+                errorBuilder: (c, e, s) =>
+                    Icon(Icons.sim_card, color: Colors.grey, size: 32),
               ),
             ),
           ),
           SizedBox(height: 6),
-          Text(label, style: TextStyle(fontSize: 13, color: checked ? Color(0xFF1DA1F2) : Color(0xFF222B45), fontWeight: checked ? FontWeight.bold : FontWeight.normal)),
+          Text(label,
+              style: TextStyle(
+                  fontSize: 13,
+                  color: checked ? Color(0xFF1DA1F2) : Color(0xFF222B45),
+                  fontWeight: checked ? FontWeight.bold : FontWeight.normal)),
         ],
       ),
     );
@@ -394,69 +455,88 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
           // Header
           Container(
             color: mainBlue,
-            padding: const EdgeInsets.only(top: 0, left: 0, right: 0, bottom: 0),
+            padding:
+                const EdgeInsets.only(top: 0, left: 0, right: 0, bottom: 0),
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 child: Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     IconButton(
                       icon: Icon(Icons.arrow_back_ios_new, color: Colors.white),
                       onPressed: () {
-                        Navigator.of(context).pushNamedAndRemoveUntil('/home', (route) => false, arguments: widget.helper);
+                        Navigator.of(context).pushNamedAndRemoveUntil(
+                            '/home', (route) => false,
+                            arguments: widget.helper);
                       },
                     ),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('Đầu số đang chọn', style: TextStyle(color: Colors.white70, fontSize: 14)),
+                          Text('Đầu số đang chọn',
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 14)),
                           Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              if (_optionChecked[0] && _carrierChecked.contains(true))
-                                ...[
-                                  if (_carrierChecked[0])
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Image.asset(
-                                        'lib/src/assets/images/viettel.png',
-                                        height: 22,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
-                                      ),
+                              if (_optionChecked[0] &&
+                                  _carrierChecked.contains(true)) ...[
+                                if (_carrierChecked[0])
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Image.asset(
+                                      'lib/src/assets/images/viettel.png',
+                                      height: 22,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (c, e, s) => Icon(
+                                          Icons.image,
+                                          color: Colors.white,
+                                          size: 22),
                                     ),
-                                  if (_carrierChecked[1])
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Image.asset(
-                                        'lib/src/assets/images/vinaphone.png',
-                                        height: 22,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
-                                      ),
+                                  ),
+                                if (_carrierChecked[1])
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Image.asset(
+                                      'lib/src/assets/images/vinaphone.png',
+                                      height: 22,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (c, e, s) => Icon(
+                                          Icons.image,
+                                          color: Colors.white,
+                                          size: 22),
                                     ),
-                                  if (_carrierChecked[2])
-                                    Padding(
-                                      padding: const EdgeInsets.only(right: 8),
-                                      child: Image.asset(
-                                        'lib/src/assets/images/mobifone.png',
-                                        height: 22,
-                                        fit: BoxFit.contain,
-                                        errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
-                                      ),
+                                  ),
+                                if (_carrierChecked[2])
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 8),
+                                    child: Image.asset(
+                                      'lib/src/assets/images/mobifone.png',
+                                      height: 22,
+                                      fit: BoxFit.contain,
+                                      errorBuilder: (c, e, s) => Icon(
+                                          Icons.image,
+                                          color: Colors.white,
+                                          size: 22),
                                     ),
-                                ]
-                              else
-                                Text(selectedNumber, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                                  ),
+                              ] else
+                                Text(selectedNumber,
+                                    style: TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 18)),
                               SizedBox(width: 8),
                               Image.asset(
                                 'lib/src/assets/images/soly.png',
                                 height: 22,
                                 fit: BoxFit.contain,
-                                errorBuilder: (c, e, s) => Icon(Icons.image, color: Colors.white, size: 22),
+                                errorBuilder: (c, e, s) => Icon(Icons.image,
+                                    color: Colors.white, size: 22),
                               ),
                               SizedBox(width: 6),
                               Text(
@@ -515,7 +595,8 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                     Stack(
                       children: [
                         IconButton(
-                          icon: Icon(Icons.settings, color: keyTextColor, size: 28),
+                          icon: Icon(Icons.settings,
+                              color: keyTextColor, size: 28),
                           onPressed: () {
                             _showOptionsSheet();
                             if (_optionChecked[0]) {
@@ -535,11 +616,15 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                                 color: Colors.red,
                                 shape: BoxShape.circle,
                               ),
-                              constraints: BoxConstraints(minWidth: 18, minHeight: 18),
+                              constraints:
+                                  BoxConstraints(minWidth: 18, minHeight: 18),
                               child: Center(
                                 child: Text(
                                   '${_optionChecked.where((e) => e).length}',
-                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),
@@ -559,9 +644,13 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(height: 24),
-                  Icon(Icons.sync, size: 80, color: lightBlue.withOpacity(0.2)), // Thay bằng hình minh họa nếu có
+                  Icon(Icons.sync,
+                      size: 80,
+                      color: lightBlue
+                          .withOpacity(0.2)), // Thay bằng hình minh họa nếu có
                   SizedBox(height: 16),
-                  Text('Chưa có dữ liệu', style: TextStyle(color: Colors.grey, fontSize: 16)),
+                  Text('Chưa có dữ liệu',
+                      style: TextStyle(color: Colors.grey, fontSize: 16)),
                 ],
               ),
             ),
@@ -569,21 +658,27 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
           // Bàn phím số
           Container(
             color: Colors.white,
-            padding: const EdgeInsets.only(top: 8, left: 0, right: 0, bottom: 0),
+            padding:
+                const EdgeInsets.only(top: 8, left: 0, right: 0, bottom: 0),
             child: Column(
               children: [
                 Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
                   child: Row(
                     children: [
                       Expanded(
                         child: TextField(
                           controller: _numberController,
                           keyboardType: TextInputType.phone,
-                          style: TextStyle(fontSize: 22, color: keyTextColor, fontWeight: FontWeight.w600),
+                          style: TextStyle(
+                              fontSize: 22,
+                              color: keyTextColor,
+                              fontWeight: FontWeight.w600),
                           decoration: InputDecoration(
                             hintText: 'Nhập số điện thoại',
-                            hintStyle: TextStyle(color: Colors.grey.shade400, fontSize: 18),
+                            hintStyle: TextStyle(
+                                color: Colors.grey.shade400, fontSize: 18),
                             border: InputBorder.none,
                           ),
                           textAlign: TextAlign.left,
@@ -616,7 +711,8 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                             child: Container(
                               width: 100,
                               height: 56,
-                              margin: EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                              margin: EdgeInsets.symmetric(
+                                  horizontal: 4, vertical: 2),
                               decoration: BoxDecoration(
                                 color: Color(0xFFF6F8FC), // màu nền xám nhạt
                                 borderRadius: BorderRadius.circular(18),
@@ -643,7 +739,8 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                     Stack(
                       children: [
                         IconButton(
-                          icon: Icon(Icons.settings, color: keyTextColor, size: 28),
+                          icon: Icon(Icons.settings,
+                              color: keyTextColor, size: 28),
                           onPressed: () {
                             _showOptionsSheet();
                             // Nếu đã chọn ưu tiên gọi nội mạng thì show chọn nhà mạng
@@ -664,11 +761,15 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                                 color: Colors.red,
                                 shape: BoxShape.circle,
                               ),
-                              constraints: BoxConstraints(minWidth: 18, minHeight: 18),
+                              constraints:
+                                  BoxConstraints(minWidth: 18, minHeight: 18),
                               child: Center(
                                 child: Text(
                                   '${_carrierChecked.where((e) => e).length}',
-                                  style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.bold),
                                 ),
                               ),
                             ),
@@ -697,9 +798,11 @@ class _DialPadWidgetState extends State<DialPadWidget> implements SipUaHelperLis
                     ),
                     // Nút xóa
                     IconButton(
-                      icon: Icon(Icons.backspace_outlined, color: keyTextColor, size: 28),
+                      icon: Icon(Icons.backspace_outlined,
+                          color: keyTextColor, size: 28),
                       onPressed: _backspace,
-                      onLongPress: () => setState(() => _numberController.clear()),
+                      onLongPress: () =>
+                          setState(() => _numberController.clear()),
                     ),
                   ],
                 ),
